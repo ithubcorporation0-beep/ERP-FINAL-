@@ -1,5 +1,12 @@
-// IT Hub ERP — multi-tenant schema.
-// Every business record carries `organizationId`; see docs/database.md.
+// IT Hub ERP — core platform schema (phase 02).
+//
+// Conventions (see docs/database.md):
+// - Tables and columns are snake_case in PostgreSQL (@@map / @map); models and fields are PascalCase / camelCase in TypeScript.
+// - IDs are UUID v7 (time-ordered) stored as native `uuid`.
+// - Every tenant-owned table has `company_id`. Child tables carry it too, with a composite foreign key
+//   to their parent so a row can never point at another company's data.
+// - Editable records have created_at / updated_at / created_by / updated_by. Timestamps are `timestamptz`.
+// - ERP module tables (invoices, employees, …) are added by their own phases.
 
 generator client {
   provider = "prisma-client"
@@ -11,516 +18,309 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─── Tenancy & Auth ──────────────────────────────────────────
+// ─── Companies (tenants) ─────────────────────────────────────
 
-model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  currency  String   @default("USD")
-  timezone  String   @default("UTC")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum CompanyStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
 
-  memberships   Membership[]
-  roles         Role[]
-  customers     Customer[]
-  leads         Lead[]
-  invoices      Invoice[]
-  payments      Payment[]
-  expenses      Expense[]
-  employees     Employee[]
-  payrollRuns   PayrollRun[]
-  projects      Project[]
-  products      Product[]
-  suppliers     Supplier[]
-  purchases     Purchase[]
-  accounts      Account[]
-  journalEntries JournalEntry[]
-  notifications Notification[]
-  auditLogs     AuditLog[]
+  @@map("company_status")
+}
+
+model Company {
+  id                   String        @id @default(uuid(7)) @db.Uuid
+  name                 String
+  legalName            String?       @map("legal_name")
+  /// URL-safe unique identifier, e.g. "it-hub".
+  slug                 String        @unique
+  status               CompanyStatus @default(ACTIVE)
+  taxId                String?       @map("tax_id")
+  email                String?
+  phone                String?
+  address              String?
+  /// ISO 3166-1 alpha-2, e.g. "US".
+  country              String?       @db.Char(2)
+  /// ISO 4217, e.g. "USD". All monetary values of the company are in this currency unless stated.
+  baseCurrency         String        @default("USD") @map("base_currency") @db.Char(3)
+  /// IANA time zone, e.g. "Asia/Dubai".
+  timezone             String        @default("UTC")
+  /// BCP 47 locale for number and date formatting, e.g. "en-US".
+  locale               String        @default("en-US")
+  /// 1 = January.
+  fiscalYearStartMonth Int           @default(1) @map("fiscal_year_start_month") @db.SmallInt
+  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById          String?       @map("created_by") @db.Uuid
+  updatedById          String?       @map("updated_by") @db.Uuid
+  deletedAt            DateTime?     @map("deleted_at") @db.Timestamptz(3)
+
+  createdBy       User?            @relation("CompanyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy       User?            @relation("CompanyUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  memberships     Membership[]
+  roles           Role[]
+  rolePermissions RolePermission[]
+  settings        Setting[]
+  auditLogs       AuditLog[]
+  customers       Customer[]
+  notifications   Notification[]
+
+  @@map("companies")
+}
+
+// ─── Users & sessions (global; linked to companies through memberships) ─
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+
+  @@map("user_status")
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
+  id           String     @id @default(uuid(7)) @db.Uuid
+  /// Stored lower-case.
+  email        String     @unique
   name         String
-  passwordHash String
-  isActive     Boolean   @default(true)
-  lastLoginAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  passwordHash String     @map("password_hash")
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?  @map("last_login_at") @db.Timestamptz(3)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById  String?    @map("created_by") @db.Uuid
+  updatedById  String?    @map("updated_by") @db.Uuid
 
-  memberships   Membership[]
+  createdBy User? @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User? @relation("UserUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
   sessions      Session[]
+  memberships   Membership[]   @relation("MembershipUser")
   notifications Notification[]
   auditLogs     AuditLog[]
-  employee      Employee?
-  assignedTasks Task[]       @relation("TaskAssignee")
+
+  // Back-relations for created_by / updated_by columns (required by Prisma, not used in code).
+  usersCreated           User[]           @relation("UserCreatedBy")
+  usersUpdated           User[]           @relation("UserUpdatedBy")
+  companiesCreated       Company[]        @relation("CompanyCreatedBy")
+  companiesUpdated       Company[]        @relation("CompanyUpdatedBy")
+  rolesCreated           Role[]           @relation("RoleCreatedBy")
+  rolesUpdated           Role[]           @relation("RoleUpdatedBy")
+  rolePermissionsCreated RolePermission[] @relation("RolePermissionCreatedBy")
+  membershipsCreated     Membership[]     @relation("MembershipCreatedBy")
+  membershipsUpdated     Membership[]     @relation("MembershipUpdatedBy")
+  settingsCreated        Setting[]        @relation("SettingCreatedBy")
+  settingsUpdated        Setting[]        @relation("SettingUpdatedBy")
+  customersCreated       Customer[]       @relation("CustomerCreatedBy")
+  customersUpdated       Customer[]       @relation("CustomerUpdatedBy")
+
+  @@map("users")
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  userId    String
-  tokenHash String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid(7)) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  /// SHA-256 of the cookie token; the token itself is never stored.
+  tokenHash  String   @unique @map("token_hash")
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(3)
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastUsedAt DateTime @default(now()) @map("last_used_at") @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ─── Access control ──────────────────────────────────────────
+
+/// Global catalogue of permissions, synced from src/lib/permissions by the seed. Not tenant-owned.
+model Permission {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  /// "module:action", e.g. "invoices:create".
+  key         String   @unique
+  module      String
+  action      String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  rolePermissions RolePermission[]
+
+  @@index([module])
+  @@map("permissions")
 }
 
 model Role {
-  id             String   @id @default(cuid())
-  organizationId String
-  name           String
-  description    String?
-  // Permission keys such as "invoices:create"; see docs/permissions.md.
-  permissions    String[]
-  isSystem       Boolean  @default(false)
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  memberships  Membership[]
-
-  @@unique([organizationId, name])
-}
-
-model Membership {
-  id             String   @id @default(cuid())
-  organizationId String
-  userId         String
-  roleId         String
-  createdAt      DateTime @default(now())
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role         Role         @relation(fields: [roleId], references: [id])
-
-  @@unique([organizationId, userId])
-}
-
-// ─── CRM ─────────────────────────────────────────────────────
-
-enum LeadStatus {
-  NEW
-  CONTACTED
-  QUALIFIED
-  PROPOSAL
-  WON
-  LOST
-}
-
-model Customer {
-  id             String    @id @default(cuid())
-  organizationId String
-  name           String
-  email          String?
-  phone          String?
-  address        String?
-  taxId          String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  deletedAt      DateTime?
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  invoices     Invoice[]
-  projects     Project[]
-  leads        Lead[]
-
-  @@index([organizationId])
-}
-
-model Lead {
-  id             String     @id @default(cuid())
-  organizationId String
-  customerId     String?
-  title          String
-  contactName    String
-  email          String?
-  phone          String?
-  source         String?
-  status         LeadStatus @default(NEW)
-  value          Decimal?   @db.Decimal(14, 2)
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer     Customer?    @relation(fields: [customerId], references: [id])
-
-  @@index([organizationId, status])
-}
-
-// ─── Sales & Finance ─────────────────────────────────────────
-
-enum InvoiceStatus {
-  DRAFT
-  SENT
-  PARTIALLY_PAID
-  PAID
-  OVERDUE
-  VOID
-}
-
-model Invoice {
-  id             String        @id @default(cuid())
-  organizationId String
-  customerId     String
-  number         String
-  status         InvoiceStatus @default(DRAFT)
-  issueDate      DateTime
-  dueDate        DateTime
-  subtotal       Decimal       @db.Decimal(14, 2)
-  taxTotal       Decimal       @default(0) @db.Decimal(14, 2)
-  total          Decimal       @db.Decimal(14, 2)
-  amountPaid     Decimal       @default(0) @db.Decimal(14, 2)
-  notes          String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer     Customer      @relation(fields: [customerId], references: [id])
-  items        InvoiceItem[]
-  payments     Payment[]
-
-  @@unique([organizationId, number])
-  @@index([organizationId, status])
-}
-
-model InvoiceItem {
-  id          String   @id @default(cuid())
-  invoiceId   String
-  productId   String?
-  description String
-  quantity    Decimal  @db.Decimal(14, 3)
-  unitPrice   Decimal  @db.Decimal(14, 2)
-  taxRate     Decimal  @default(0) @db.Decimal(5, 2)
-  lineTotal   Decimal  @db.Decimal(14, 2)
-
-  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [productId], references: [id])
-}
-
-model Payment {
-  id             String   @id @default(cuid())
-  organizationId String
-  invoiceId      String
-  amount         Decimal  @db.Decimal(14, 2)
-  method         String
-  reference      String?
-  paidAt         DateTime
-  createdAt      DateTime @default(now())
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  invoice      Invoice      @relation(fields: [invoiceId], references: [id])
-
-  @@index([organizationId])
-}
-
-model Expense {
-  id             String   @id @default(cuid())
-  organizationId String
-  category       String
-  description    String?
-  amount         Decimal  @db.Decimal(14, 2)
-  spentAt        DateTime
-  receiptUrl     String?
-  createdAt      DateTime @default(now())
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  @@index([organizationId, spentAt])
-}
-
-// ─── Accounting (double entry) ───────────────────────────────
-
-enum AccountType {
-  ASSET
-  LIABILITY
-  EQUITY
-  REVENUE
-  EXPENSE
-}
-
-model Account {
-  id             String      @id @default(cuid())
-  organizationId String
-  code           String
-  name           String
-  type           AccountType
-
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  lines        JournalLine[]
-
-  @@unique([organizationId, code])
-}
-
-model JournalEntry {
-  id             String   @id @default(cuid())
-  organizationId String
-  date           DateTime
-  memo           String?
-  sourceType     String?
-  sourceId       String?
-  createdAt      DateTime @default(now())
-
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  lines        JournalLine[]
-
-  @@index([organizationId, date])
-}
-
-model JournalLine {
-  id        String  @id @default(cuid())
-  entryId   String
-  accountId String
-  debit     Decimal @default(0) @db.Decimal(14, 2)
-  credit    Decimal @default(0) @db.Decimal(14, 2)
-
-  entry   JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
-  account Account      @relation(fields: [accountId], references: [id])
-}
-
-// ─── HR ──────────────────────────────────────────────────────
-
-enum LeaveStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-model Employee {
-  id             String    @id @default(cuid())
-  organizationId String
-  userId         String?   @unique
-  employeeCode   String
-  firstName      String
-  lastName       String
-  email          String
-  department     String?
-  position       String?
-  hireDate       DateTime
-  baseSalary     Decimal   @db.Decimal(14, 2)
-  terminatedAt   DateTime?
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User?        @relation(fields: [userId], references: [id])
-  attendance   Attendance[]
-  leaves       Leave[]
-  payslips     Payslip[]
-
-  @@unique([organizationId, employeeCode])
-}
-
-model Attendance {
-  id         String    @id @default(cuid())
-  employeeId String
-  date       DateTime  @db.Date
-  checkIn    DateTime?
-  checkOut   DateTime?
-  status     String    @default("PRESENT")
-
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-  @@unique([employeeId, date])
-}
-
-model Leave {
-  id         String      @id @default(cuid())
-  employeeId String
-  type       String
-  startDate  DateTime    @db.Date
-  endDate    DateTime    @db.Date
-  reason     String?
-  status     LeaveStatus @default(PENDING)
-  approvedBy String?
-  createdAt  DateTime    @default(now())
-
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-}
-
-model PayrollRun {
-  id             String    @id @default(cuid())
-  organizationId String
-  periodStart    DateTime  @db.Date
-  periodEnd      DateTime  @db.Date
-  status         String    @default("DRAFT")
-  processedAt    DateTime?
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  payslips     Payslip[]
-
-  @@index([organizationId])
-}
-
-model Payslip {
-  id           String  @id @default(cuid())
-  payrollRunId String
-  employeeId   String
-  gross        Decimal @db.Decimal(14, 2)
-  deductions   Decimal @default(0) @db.Decimal(14, 2)
-  net          Decimal @db.Decimal(14, 2)
-
-  payrollRun PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
-  employee   Employee   @relation(fields: [employeeId], references: [id])
-
-  @@unique([payrollRunId, employeeId])
-}
-
-// ─── Projects ────────────────────────────────────────────────
-
-enum TaskStatus {
-  TODO
-  IN_PROGRESS
-  REVIEW
-  DONE
-}
-
-model Project {
-  id             String    @id @default(cuid())
-  organizationId String
-  customerId     String?
-  name           String
-  description    String?
-  status         String    @default("ACTIVE")
-  startDate      DateTime?
-  endDate        DateTime?
-  budget         Decimal?  @db.Decimal(14, 2)
-  createdAt      DateTime  @default(now())
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer     Customer?    @relation(fields: [customerId], references: [id])
-  tasks        Task[]
-
-  @@index([organizationId])
-}
-
-model Task {
-  id          String     @id @default(cuid())
-  projectId   String
-  assigneeId  String?
-  title       String
+  id          String   @id @default(uuid(7)) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  name        String
   description String?
-  status      TaskStatus @default(TODO)
-  dueDate     DateTime?
-  createdAt   DateTime   @default(now())
+  /// Built-in roles (Owner, Admin, …) cannot be deleted.
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by") @db.Uuid
+  updatedById String?  @map("updated_by") @db.Uuid
 
-  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assignee User?   @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy       User?            @relation("RoleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy       User?            @relation("RoleUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  rolePermissions RolePermission[]
+  memberships     Membership[]
 
-  @@index([projectId, status])
+  @@unique([companyId, name])
+  /// Target of composite foreign keys that keep children in the same company.
+  @@unique([id, companyId])
+  @@map("roles")
 }
 
-// ─── Inventory & Purchasing ──────────────────────────────────
+model RolePermission {
+  companyId    String   @map("company_id") @db.Uuid
+  roleId       String   @map("role_id") @db.Uuid
+  permissionId String   @map("permission_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById  String?  @map("created_by") @db.Uuid
 
-model Product {
-  id             String   @id @default(cuid())
-  organizationId String
-  sku            String
-  name           String
-  description    String?
-  unitPrice      Decimal  @db.Decimal(14, 2)
-  costPrice      Decimal  @default(0) @db.Decimal(14, 2)
-  stockQuantity  Decimal  @default(0) @db.Decimal(14, 3)
-  reorderLevel   Decimal  @default(0) @db.Decimal(14, 3)
-  isService      Boolean  @default(false)
-  createdAt      DateTime @default(now())
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  /// Composite FK: the role must belong to the same company.
+  role       Role       @relation(fields: [roleId, companyId], references: [id, companyId], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdBy  User?      @relation("RolePermissionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  invoiceItems   InvoiceItem[]
-  purchaseItems  PurchaseItem[]
-  stockMovements StockMovement[]
-
-  @@unique([organizationId, sku])
+  @@id([roleId, permissionId])
+  @@index([companyId])
+  @@index([permissionId])
+  @@map("role_permissions")
 }
 
-model Supplier {
-  id             String  @id @default(cuid())
-  organizationId String
-  name           String
-  email          String?
-  phone          String?
-  address        String?
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  purchases    Purchase[]
-
-  @@index([organizationId])
+  @@map("membership_status")
 }
 
-model Purchase {
-  id             String   @id @default(cuid())
-  organizationId String
-  supplierId     String
-  number         String
-  status         String   @default("DRAFT")
-  orderDate      DateTime
-  total          Decimal  @db.Decimal(14, 2)
+/// A user's access to one company, with one role in that company.
+model Membership {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  companyId   String           @map("company_id") @db.Uuid
+  userId      String           @map("user_id") @db.Uuid
+  roleId      String           @map("role_id") @db.Uuid
+  status      MembershipStatus @default(ACTIVE)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById String?          @map("created_by") @db.Uuid
+  updatedById String?          @map("updated_by") @db.Uuid
 
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  supplier     Supplier       @relation(fields: [supplierId], references: [id])
-  items        PurchaseItem[]
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user      User    @relation("MembershipUser", fields: [userId], references: [id], onDelete: Cascade)
+  /// Composite FK: the role must belong to the same company as the membership.
+  role      Role    @relation(fields: [roleId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy User?   @relation("MembershipCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?   @relation("MembershipUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
-  @@unique([organizationId, number])
+  @@unique([companyId, userId])
+  @@index([userId])
+  @@map("memberships")
 }
 
-model PurchaseItem {
-  id         String  @id @default(cuid())
-  purchaseId String
-  productId  String
-  quantity   Decimal @db.Decimal(14, 3)
-  unitCost   Decimal @db.Decimal(14, 2)
+// ─── Company settings ────────────────────────────────────────
 
-  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  product  Product  @relation(fields: [productId], references: [id])
+/// Per-company preferences as validated key/value pairs. Keys, types and defaults are defined in
+/// src/lib/settings/registry.ts — never read or write raw values without it.
+model Setting {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  key         String
+  value       Json
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by") @db.Uuid
+  updatedById String?  @map("updated_by") @db.Uuid
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("SettingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?   @relation("SettingUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, key])
+  @@map("settings")
 }
 
-model StockMovement {
-  id        String   @id @default(cuid())
-  productId String
-  quantity  Decimal  @db.Decimal(14, 3) // positive = in, negative = out
-  reason    String
-  reference String?
-  createdAt DateTime @default(now())
+// ─── Audit log (append-only) ─────────────────────────────────
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@index([productId, createdAt])
-}
-
-// ─── Platform ────────────────────────────────────────────────
-
-model Notification {
-  id             String    @id @default(cuid())
-  organizationId String
-  userId         String
-  title          String
-  body           String?
-  link           String?
-  readAt         DateTime?
-  createdAt      DateTime  @default(now())
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, readAt])
-}
-
+/// Immutable history of important actions. Rows are never updated or deleted by the application,
+/// so there are no updated_at / updated_by columns. company_id is null for account-level events
+/// (e.g. sign-in) that do not belong to one company.
 model AuditLog {
-  id             String   @id @default(cuid())
-  organizationId String
-  actorId        String?
-  action         String
-  entityType     String
-  entityId       String
-  before         Json?
-  after          Json?
-  ipAddress      String?
-  createdAt      DateTime @default(now())
+  id         String   @id @default(uuid(7)) @db.Uuid
+  companyId  String?  @map("company_id") @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  /// Dotted verb, e.g. "customer.create", "auth.login".
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  before     Json?
+  after      Json?
+  metadata   Json?
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  actor        User?        @relation(fields: [actorId], references: [id])
+  /// Restrict: a company with audit history cannot be hard-deleted (archive it instead).
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  actor   User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
 
-  @@index([organizationId, entityType, entityId])
-  @@index([organizationId, createdAt])
+  @@index([companyId, createdAt(sort: Desc)])
+  @@index([companyId, entityType, entityId])
+  @@index([actorId, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+// ─── Platform records already used by the app ────────────────
+
+/// Reference module for the repository → service → route pattern (phase 06 extends it).
+model Customer {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  name        String
+  email       String?
+  phone       String?
+  address     String?
+  taxId       String?   @map("tax_id")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by") @db.Uuid
+  updatedById String?   @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdBy User?   @relation("CustomerCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?   @relation("CustomerUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, deletedAt])
+  @@index([companyId, name])
+  @@map("customers")
+}
+
+/// In-app notifications; the header bell shows the unread count (phase 13 adds the full feature).
+model Notification {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  companyId String    @map("company_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime? @map("read_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, userId, readAt])
+  @@map("notifications")
 }

@@ -2,7 +2,10 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { NAV_ITEMS, allowedNavHrefs, findNavItem, visibleNavSections } from "@/config/navigation";
-import { DEFAULT_ROLES } from "@/lib/permissions";
+import { DEFAULT_ROLES, expandPermissions } from "@/lib/permissions";
+
+// Roles as stored in the database: wildcards expanded to concrete permission keys.
+const rolePermissions = (name: string) => expandPermissions(DEFAULT_ROLES[name]?.permissions ?? []);
 
 describe("navigation", () => {
   it("every nav item has a page, so the menu never links to a 404", () => {
@@ -18,11 +21,11 @@ describe("navigation", () => {
   });
 
   it("shows everything to the Owner role", () => {
-    expect(allowedNavHrefs(DEFAULT_ROLES.Owner ?? [])).toHaveLength(NAV_ITEMS.length);
+    expect(allowedNavHrefs(rolePermissions("Owner"))).toHaveLength(NAV_ITEMS.length);
   });
 
   it("hides modules a role cannot read", () => {
-    const hrefs = allowedNavHrefs(DEFAULT_ROLES.Employee ?? []);
+    const hrefs = allowedNavHrefs(rolePermissions("Employee"));
     expect(hrefs).toEqual(["/dashboard", "/projects", "/notifications"]);
     expect(visibleNavSections(hrefs).map((section) => section.title)).toEqual([
       "Overview",

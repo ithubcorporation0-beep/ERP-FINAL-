@@ -27,6 +27,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://erp:erp@localhost:5432/it_hub_erp?schema=public
+      TEST_DATABASE_URL: postgresql://erp:erp@localhost:5432/it_hub_erp_test?schema=public
       APP_URL: http://localhost:3000
       NEXT_TELEMETRY_DISABLED: 1
       # CI-only throwaway credentials for the seeded admin used by the e2e tests.
@@ -44,6 +45,10 @@ jobs:
       - run: npx prisma validate
       - name: Apply migrations to a fresh database
         run: npx prisma migrate deploy
+      - name: Check migrations match the schema (no drift)
+        run: npm run db:check
+      - name: Create the integration test database
+        run: PGPASSWORD=erp psql -h localhost -U erp -d it_hub_erp -c "CREATE DATABASE it_hub_erp_test"
       - name: Seed the database
         run: npm run db:seed
 

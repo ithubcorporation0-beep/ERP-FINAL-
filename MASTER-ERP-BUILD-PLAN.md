@@ -14,7 +14,7 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 | --- | ----------------------------------------------------------------- | ------ |
 | 00  | `chore(phase-00): initialize ERP project foundation`              | ✅     |
 | 01  | `feat(phase-01): establish ERP UI and UX design system`           | ✅     |
-| 02  | `feat(phase-02): establish application foundation`                | 🟡     |
+| 02  | `feat(phase-02): establish database and backend foundation`       | ✅     |
 | 03  | `feat(phase-03): implement authentication and RBAC`               | 🟡     |
 | 04  | `feat(phase-04): implement multi-tenant company foundation`       | 🟡     |
 | 05  | `feat(phase-05): implement dashboard`                             | ⬜     |
@@ -60,13 +60,18 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 - ✅ Placeholder navigation for all modules, filtered by role; honest "not available yet" pages
 - ✅ Dev-only component reference at `/design-system`; docs in `docs/design-system.md`
 
-## Phase 02 — Application foundation
+## Phase 02 — Database and backend foundation
 
-- ✅ Prisma client, Zod validation, route handler error mapping (`lib/api.ts`)
-- ✅ Repository → service → route layering (customers as reference)
-- ✅ Initial migration (done in phase 00)
-- ✅ Environment variable validation at startup (done in phase 00)
-- ⬜ Integration test setup against a test database
+- ✅ Core schema: companies, users, sessions, permissions, roles, role_permissions, memberships, settings, audit_logs
+  (+ customers and notifications, which the app already uses)
+- ✅ Conventions: snake_case tables, UUID v7, timestamptz, `company_id` on every tenant table, composite FKs,
+  created/updated at/by
+- ✅ Fresh baseline migration; drift check (`npm run db:check`) in CI
+- ✅ Seed workflow via real services: permission catalogue, first company, built-in roles, Owner (idempotent)
+- ✅ Error handling (`AppError`, `handle()`, `runAction()`), structured redacting logger, request ids
+- ✅ Repository/service conventions (`helpers.ts`), settings registry + service, audit service
+- ✅ Sign-in, failed sign-in and sign-out are audited
+- ✅ Integration tests against real PostgreSQL (bootstrap, tenant isolation, constraints, settings)
 
 ## Phase 03 — Authentication and RBAC
 
@@ -74,14 +79,14 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 - ✅ Permission model with wildcards, `requirePermission`, default roles
 - ⬜ Route protection middleware, password reset, session revocation UI
 - ⬜ Login rate limiting
-- ⬜ Audit login/logout (decide schema: nullable `organizationId` or separate auth log)
+- ✅ Audit login/logout (done in phase 02: `audit_logs.company_id` is nullable for account events)
 
 ## Phase 04 — Multi-tenant company foundation
 
-- ✅ `organizationId` on all business data, `requireTenant`
+- ✅ `company_id` on all tenant data (with composite FKs), `requireTenant` (done in phase 02)
 - ⬜ Company switcher, company settings (currency, timezone)
 - ⬜ Invite users, assign roles, manage memberships
-- ⬜ Tenant-isolation tests
+- 🟡 Tenant-isolation tests (customers + constraints done in phase 02; extend per module)
 
 ## Phase 05 — Dashboard
 

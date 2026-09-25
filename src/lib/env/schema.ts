@@ -15,6 +15,10 @@ export const serverEnvSchema = z.object({
     .min(1, "DATABASE_URL is required")
     .refine((value) => /^postgres(ql)?:\/\//.test(value), "DATABASE_URL must be a postgresql:// URL"),
   APP_URL: z.url().default("http://localhost:3000"),
+  LOG_LEVEL: z
+    .enum(["debug", "info", "warn", "error"])
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
 
   SMTP_HOST: optional,
   SMTP_PORT: z.coerce.number().int().positive().default(587),

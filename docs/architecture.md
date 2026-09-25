@@ -1,8 +1,8 @@
 # Architecture
 
 IT Hub ERP is **one Next.js application** that serves both the web pages and the API, backed by one
-**PostgreSQL** database. Many companies ("organizations") share the same app and database; every
-business record belongs to exactly one organization.
+**PostgreSQL** database. Many **companies** (tenants) share the same app and database; every
+business record belongs to exactly one company (`company_id`). One user can belong to several companies.
 
 ## Tech stack
 
@@ -36,8 +36,18 @@ src/
   server/
     actions/             Server Actions called from forms
     services/            Business rules, transactions, audit logging
-    repositories/        Database queries (Prisma), always scoped by organizationId
-  lib/                   Infrastructure: auth, db, env, permissions, tenant, validation, audit, utils
+    repositories/        Database queries (Prisma), always scoped by companyId; helpers.ts = conventions
+  lib/
+    api.ts               handle(): route-handler wrapper → consistent JSON errors
+    action.ts            runAction(): server-action wrapper → ActionResult
+    errors.ts            AppError family + toAppError() (maps Zod and database errors)
+    logger.ts            Structured logger with secret redaction
+    auth/ db/ env/       Sessions & passwords · Prisma client · validated environment
+    permissions/         Permission catalogue, default roles, hasPermission()
+    settings/            Settings registry (keys, schemas, defaults)
+    tenant/              requireTenant() / requirePermission() → TenantContext
+    audit/               Audit snapshot serializer (redacts secrets)
+    validation/ utils.ts Zod input schemas · small helpers
   config/                Static app config (site name; navigation = single source for menu, search, breadcrumbs)
   types/                 Shared TypeScript types
   generated/prisma/      Prisma client — generated on `npm install`, not committed
@@ -55,10 +65,10 @@ API client ──► src/app/api/* route ────────┘        │
 
 1. **Route handlers and server actions are thin:** validate input with Zod → check login and
    permission (`requirePermission`) → call a service.
-2. **Services** hold business rules. They receive a `TenantContext` and pass `ctx.organizationId`
-   to repositories. Mutations write an `AuditLog` row in the same database transaction.
+2. **Services** hold business rules. They receive a `TenantContext` and pass `ctx.companyId`
+   to repositories. Mutations write an `audit_logs` row in the same database transaction.
 3. **Repositories** are the only code that queries business data with Prisma. A repository function
-   without an `organizationId` argument is a bug (it could leak another company's data).
+   for company data without a `companyId` argument is a bug (it could leak another company's data).
 4. **UI components never touch the database.** ESLint blocks `@/lib/db`, `@/generated/prisma` and
    repository imports inside `src/components` and `src/features`.
 
@@ -68,6 +78,82 @@ Authentication is a service too (`auth.service.ts`): the login form's server act
 The full rule set every contributor and AI agent must follow is in [`AGENTS.md`](../AGENTS.md).
 Several of those rules are enforced automatically by ESLint (no `any`, no `@ts-ignore`, no empty
 `catch`, no database access from UI).
+
+## Backend conventions
+
+### TenantContext
+
+`requireTenant()` / `requirePermission(module, action)` (`src/lib/tenant`) run on the server for every
+request that touches company data. They read the session cookie, load the user's **active membership in
+an active company** and return:
+
+```ts
+interface TenantContext {
+  userId: string;
+  companyId: string;
+  roleId: string;
+  permissions: string[];
+}
+```
+
+Nothing trusts a company id sent by the browser: the company always comes from the membership.
+
+### Repositories (`src/server/repositories/*.repository.ts`)
+
+- One file per table/aggregate, exporting a plain object (`customerRepository.list(...)`).
+- **`companyId` is the first argument** of every function that reads or writes company data, and every
+  query filters by it — including updates/deletes (`updateMany({ where: { id, companyId } })`), so a
+  guessed id from another company matches nothing.
+- The **last argument is an optional `client: DbClient`** (defaults to `db`); services pass the
+  transaction client so several writes commit or fail together.
+- Writes stamp audit columns with `createdBy(actorId)` / `updatedBy(actorId)` from `helpers.ts`;
+  lists use `pageArgs()` / `toPage()`.
+- Repositories return data or `null`. They never check permissions and never throw `AppError`s.
+
+### Services (`src/server/services/*.service.ts`)
+
+- Receive a `TenantContext` first; hold the business rules.
+- Throw `AppError`s for expected failures (`NotFoundError`, `ValidationError`, `ConflictError`, …).
+- Wrap multi-step writes in `db.$transaction(async (tx) => …)` and call `writeAuditLog(ctx, event, tx)`
+  inside it, so the change and its audit entry are saved together or not at all.
+- Account-level events without a company (sign-in, failed sign-in, sign-out) use `recordAuditEvent()`.
+
+### Errors
+
+| Thrown                            | HTTP | `code`              | Shown to the user                                            |
+| --------------------------------- | ---- | ------------------- | ------------------------------------------------------------ |
+| `UnauthenticatedError`            | 401  | `UNAUTHENTICATED`   | Yes                                                          |
+| `ForbiddenError`                  | 403  | `FORBIDDEN`         | Yes                                                          |
+| `NotFoundError`                   | 404  | `NOT_FOUND`         | Yes                                                          |
+| `ConflictError`, DB `P2002/P2003` | 409  | `CONFLICT`          | Yes                                                          |
+| `ValidationError`, `ZodError`     | 422  | `VALIDATION_FAILED` | Yes, with per-field `details`                                |
+| Anything else                     | 500  | `INTERNAL`          | Generic message only; full error is logged with a request id |
+
+- **API routes** wrap their handler in `handle()` (`src/lib/api.ts`). Error body:
+  `{ "error": { "code", "message", "details?", "requestId" } }`; the id is also in the `x-request-id`
+  header and in the server log.
+- **Server actions** wrap their logic in `runAction()` (`src/lib/action.ts`) and return
+  `{ ok: true, data } | { ok: false, error }` — they never throw raw errors to the browser.
+- Both let Next.js `redirect()` / `notFound()` pass through.
+- Pages rely on the `error.tsx` boundaries (`src/app/error.tsx`, `src/app/(dashboard)/error.tsx`).
+
+### Logging
+
+`logger.debug/info/warn/error(message, context)` (`src/lib/logger.ts`). JSON lines in production,
+readable output in development; level via `LOG_LEVEL`. Keys that look secret (`password`, `token`,
+`secret`, `authorization`, `cookie`, `apiKey`) are always replaced by `[redacted]`.
+
+### Audit log
+
+`audit_logs` is append-only. Snapshots (`before`/`after`) are serialized by `toAuditJson()`, which turns
+dates and decimals into JSON and redacts `passwordHash`, `tokenHash`, `password`, `token`.
+Action names are dotted verbs: `customer.create`, `setting.update`, `auth.login`, `auth.login_failed`.
+
+### Settings
+
+`settingsService.get/getAll/set` (`src/server/services/settings.service.ts`) with the registry in
+`src/lib/settings/registry.ts`: values are validated on write, defaults apply when nothing is stored,
+and every change is audited. Callers check `settings:update` before `set()`.
 
 ## Configuration (environment variables)
 
@@ -109,16 +195,20 @@ action must be confirmed. Use the shared components in `src/components/shared`:
 
 ## Testing
 
-| Kind        | Tool                      | Location                   | Command            |
-| ----------- | ------------------------- | -------------------------- | ------------------ |
-| Unit        | Vitest (Node)             | `tests/unit/**/*.test.ts`  | `npm run test`     |
-| Component   | Vitest + Testing Library  | `tests/unit/**/*.test.tsx` | `npm run test`     |
-| Integration | Vitest (reserved)         | `tests/integration/`       | `npm run test`     |
-| End-to-end  | Playwright (real browser) | `tests/e2e/*.spec.ts`      | `npm run test:e2e` |
+| Kind        | Tool                         | Location                      | Command                                     |
+| ----------- | ---------------------------- | ----------------------------- | ------------------------------------------- |
+| Unit        | Vitest (Node)                | `tests/unit/**/*.test.ts`     | `npm run test`                              |
+| Component   | Vitest + Testing Library     | `tests/unit/**/*.test.tsx`    | `npm run test`                              |
+| Integration | Vitest + **real PostgreSQL** | `tests/integration/*.test.ts` | `npm run test` / `npm run test:integration` |
+| End-to-end  | Playwright (real browser)    | `tests/e2e/*.spec.ts`         | `npm run test:e2e`                          |
+
+Integration tests need `TEST_DATABASE_URL` (see [`database.md`](database.md#testing-against-a-real-database)).
 
 ## Reference module
 
 `customers` is the fully wired reference implementation:
-`api/customers/route.ts` → `customer.service.ts` → `customer.repository.ts`.
+`api/customers/route.ts` (+ `[id]/route.ts`, which validates the id with `idSchema`) →
+`customer.service.ts` → `customer.repository.ts`, with company scoping, audit columns, soft delete,
+audit log entries and integration tests (`tests/integration/tenant-isolation.test.ts`).
 New modules copy this shape. The other API folders are permission-checked stubs that return `501`
 until their phase is implemented.

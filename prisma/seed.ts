@@ -1,75 +1,51 @@
+/**
+ * Seed = system data only, never fake business data:
+ *   1. syncs the permission catalogue,
+ *   2. creates (or updates) the first company, its built-in roles and its Owner account.
+ * Idempotent — safe to run on every deploy. Run with `npm run db:seed`.
+ */
 import "dotenv/config";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "../src/generated/prisma/client";
-import { hashPassword } from "../src/lib/auth/password";
-import { DEFAULT_ROLES } from "../src/lib/permissions";
+import { z } from "zod";
+import { db } from "@/lib/db";
+import { companyService } from "@/server/services/company.service";
 
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL must be set to run the seed.");
-const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
+const seedEnv = z.object({
+  SEED_COMPANY_NAME: z.string().trim().min(2).default("IT Hub"),
+  SEED_ADMIN_NAME: z.string().trim().min(2).default("Administrator"),
+  SEED_ADMIN_EMAIL: z.email("SEED_ADMIN_EMAIL must be an email address"),
+  SEED_ADMIN_PASSWORD: z.string().min(12, "SEED_ADMIN_PASSWORD must be at least 12 characters"),
+});
 
-const CHART_OF_ACCOUNTS = [
-  { code: "1000", name: "Cash", type: "ASSET" },
-  { code: "1100", name: "Accounts Receivable", type: "ASSET" },
-  { code: "1200", name: "Inventory", type: "ASSET" },
-  { code: "2000", name: "Accounts Payable", type: "LIABILITY" },
-  { code: "2100", name: "Sales Tax Payable", type: "LIABILITY" },
-  { code: "3000", name: "Owner's Equity", type: "EQUITY" },
-  { code: "4000", name: "Sales Revenue", type: "REVENUE" },
-  { code: "5000", name: "Cost of Goods Sold", type: "EXPENSE" },
-  { code: "6000", name: "Salaries Expense", type: "EXPENSE" },
-  { code: "6100", name: "General Expenses", type: "EXPENSE" },
-] as const;
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 async function main() {
-  const email = process.env.SEED_ADMIN_EMAIL?.toLowerCase();
-  const password = process.env.SEED_ADMIN_PASSWORD;
-  if (!email || !password) {
-    throw new Error("SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must be set to seed the admin user.");
+  const parsed = seedEnv.safeParse(process.env);
+  if (!parsed.success) {
+    const problems = parsed.error.issues.map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`);
+    throw new Error(`Cannot seed:\n${problems.join("\n")}\nSee .env.example.`);
   }
-  if (password.length < 12) throw new Error("SEED_ADMIN_PASSWORD must be at least 12 characters.");
+  const env = parsed.data;
 
-  const org = await db.organization.upsert({
-    where: { slug: "it-hub" },
-    update: {},
-    create: { name: "IT Hub", slug: "it-hub" },
+  const result = await companyService.bootstrap({
+    company: { name: env.SEED_COMPANY_NAME, slug: slugify(env.SEED_COMPANY_NAME) },
+    owner: { email: env.SEED_ADMIN_EMAIL, name: env.SEED_ADMIN_NAME, password: env.SEED_ADMIN_PASSWORD },
   });
 
-  for (const [name, permissions] of Object.entries(DEFAULT_ROLES)) {
-    await db.role.upsert({
-      where: { organizationId_name: { organizationId: org.id, name } },
-      update: { permissions },
-      create: { organizationId: org.id, name, permissions, isSystem: true },
-    });
-  }
-
-  for (const account of CHART_OF_ACCOUNTS) {
-    await db.account.upsert({
-      where: { organizationId_code: { organizationId: org.id, code: account.code } },
-      update: {},
-      create: { organizationId: org.id, ...account },
-    });
-  }
-
-  const owner = await db.role.findUniqueOrThrow({
-    where: { organizationId_name: { organizationId: org.id, name: "Owner" } },
-  });
-  const user = await db.user.upsert({
-    where: { email },
-    update: {},
-    create: { email, name: "Administrator", passwordHash: await hashPassword(password) },
-  });
-  await db.membership.upsert({
-    where: { organizationId_userId: { organizationId: org.id, userId: user.id } },
-    update: { roleId: owner.id },
-    create: { organizationId: org.id, userId: user.id, roleId: owner.id },
-  });
-
-  console.log(`Seeded organization "${org.name}" with admin ${email}`);
+  console.log(
+    `Seed complete — company "${result.company.name}" (${result.createdCompany ? "created" : "already existed"}), ` +
+      `owner ${env.SEED_ADMIN_EMAIL.toLowerCase()} (${result.createdOwner ? "created" : "already existed"}).`,
+  );
 }
 
 main()
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
+  .catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
   })
   .finally(() => db.$disconnect());

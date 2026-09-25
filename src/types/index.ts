@@ -4,8 +4,3 @@ export interface Paginated<T> {
   page: number;
   pageSize: number;
 }
-
-export interface ApiError {
-  error: string;
-  issues?: unknown[];
-}

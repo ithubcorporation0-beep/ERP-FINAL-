@@ -24,10 +24,10 @@ import { logoutAction } from "@/server/actions/auth.actions";
 
 interface UserMenuProps {
   user: { name: string; email: string };
-  organizationName: string;
+  companyName: string;
 }
 
-export function UserMenu({ user, organizationName }: UserMenuProps) {
+export function UserMenu({ user, companyName }: UserMenuProps) {
   const { theme, setTheme } = useTheme();
 
   return (
@@ -46,7 +46,7 @@ export function UserMenu({ user, organizationName }: UserMenuProps) {
         <DropdownMenuLabel className="font-normal">
           <p className="truncate text-sm font-medium text-foreground">{user.name}</p>
           <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-          <p className="mt-1 truncate text-xs text-muted-foreground">{organizationName}</p>
+          <p className="mt-1 truncate text-xs text-muted-foreground">{companyName}</p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>

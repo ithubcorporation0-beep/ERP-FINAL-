@@ -19,10 +19,9 @@ Sessions are random tokens stored hashed (SHA-256) in the `Session` table and se
 They can be revoked instantly, unlike JWTs. Because tokens are random, no signing secret is needed —
 which is why there is no `AUTH_SECRET` variable.
 
-## ADR-004: String-based permissions on roles
+## ADR-004: String-based permissions on roles — _superseded by ADR-014_
 
-Permissions are `module:action` strings on each role rather than a join table. Roles stay editable per
-organization and checks are a simple in-memory lookup.
+Permissions were `module:action` strings stored in an array on each role.
 
 ## ADR-005: Decimal money, double-entry ledger
 
@@ -106,3 +105,52 @@ before serving traffic. Error messages name the variable but never print its val
 - **`agentRules: false` in `next.config.ts`.** Next.js 16's dev server appends its own block to
   `AGENTS.md`/`CLAUDE.md` on every run. `AGENTS.md` is our binding rules file, so the equivalent
   advice ("read the docs bundled in `node_modules`") is written there by us instead.
+
+## ADR-014: Permissions as tables (phase 02)
+
+`permissions` (global catalogue) + `role_permissions` (per company) replace the string array on roles.
+Reasons: permissions become queryable and auditable ("who can approve invoices?"), foreign keys prevent
+typos, and custom roles can be edited row by row. The catalogue is still defined in code
+(`src/lib/permissions`) and synced by the seed, so code and database cannot disagree for long. Keys
+stay `module:action`, so `hasPermission()` is unchanged; wildcards are only used to _define_ roles and
+are expanded before storage.
+
+## ADR-015: Core-only schema and a fresh baseline migration (phase 02)
+
+The phase-00 draft schema contained ~20 speculative module tables (invoices, employees, stock, …) that
+no code used, used "organization" naming and lacked `created_by`/`updated_by`. Phase 02 replaces it
+with the core platform schema only; each module phase adds its own tables when its requirements are
+known. Because **no database had been deployed**, the draft migration was replaced by a new baseline
+(`20260925184444_init`) instead of a destructive "drop 20 tables" migration. From now on migrations
+are append-only. Anyone with a local database from phase 00/01 should create a new empty database
+(the old one can simply be dropped).
+
+## ADR-016: Database conventions (phase 02)
+
+- **snake_case in SQL, camelCase in TypeScript** (`@@map`/`@map`): conventional for PostgreSQL tools and
+  reports, idiomatic in code.
+- **UUID v7 ids** in native `uuid` columns: not guessable like serial numbers, safe to generate anywhere,
+  and time-ordered so B-tree indexes stay compact (unlike random UUID v4).
+- **`timestamptz`** everywhere: an ERP spans time zones; every instant is stored unambiguously in UTC.
+- **`company_id` on every tenant table, including join tables, with composite foreign keys** to the
+  parent: tenant isolation is enforced by the database, not only by application code, and the column
+  is ready for PostgreSQL row-level security later.
+- **Audit columns** `created_by`/`updated_by` are real foreign keys to `users` (`ON DELETE SET NULL`).
+- **`audit_logs` is append-only** and blocks hard deletion of a company that has history (`RESTRICT`);
+  `company_id` is nullable only for account-level events such as sign-in.
+
+## ADR-017: Error handling and logging (phase 02)
+
+A small `AppError` hierarchy with stable `code`s is the only way services report expected failures.
+`handle()` (routes) and `runAction()` (server actions) convert anything thrown — including Zod and known
+Prisma errors — into one response shape, so clients can rely on `error.code`. Unexpected errors return a
+generic message plus a `requestId` and are logged in full by a redacting structured logger; internals are
+never sent to the browser. No third-party logging library yet: JSON lines on stdout are what hosting
+platforms (e.g. Vercel) ingest; a vendor can be added behind `logger` later.
+
+## ADR-018: Integration tests against real PostgreSQL (phase 02)
+
+Services and constraints are tested against a real, migrated PostgreSQL database — never mocks — because
+most multi-tenant bugs live in queries and constraints. The runner refuses any database whose name lacks
+"test" and empties tables before each test. The seed runs with `tsx --conditions=react-server` so it can
+reuse the real services (which import `server-only` modules) instead of duplicating their logic.

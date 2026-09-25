@@ -1,39 +1,49 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import type { CustomerInput, PaginationInput } from "@/lib/validation";
+import { createdBy, pageArgs, toPage, updatedBy, type ActorId, type DbClient } from "./helpers";
 
 export const customerRepository = {
-  async list(organizationId: string, { page, pageSize, search }: PaginationInput) {
+  async list(companyId: string, query: PaginationInput, client: DbClient = db) {
     const where: Prisma.CustomerWhereInput = {
-      organizationId,
+      companyId,
       deletedAt: null,
-      ...(search ? { name: { contains: search, mode: "insensitive" } } : {}),
+      ...(query.search ? { name: { contains: query.search, mode: "insensitive" } } : {}),
     };
     const [items, total] = await Promise.all([
-      db.customer.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-      }),
-      db.customer.count({ where }),
+      client.customer.findMany({ where, orderBy: { createdAt: "desc" }, ...pageArgs(query) }),
+      client.customer.count({ where }),
     ]);
-    return { items, total, page, pageSize };
+    return toPage(items, total, query);
   },
 
-  findById(organizationId: string, id: string) {
-    return db.customer.findFirst({ where: { id, organizationId, deletedAt: null } });
+  findById(companyId: string, id: string, client: DbClient = db) {
+    return client.customer.findFirst({ where: { id, companyId, deletedAt: null } });
   },
 
-  create(organizationId: string, data: CustomerInput, tx: Prisma.TransactionClient = db) {
-    return tx.customer.create({ data: { ...data, organizationId } });
+  create(companyId: string, data: CustomerInput, actorId: ActorId, client: DbClient = db) {
+    return client.customer.create({ data: { ...data, companyId, ...createdBy(actorId) } });
   },
 
-  update(id: string, data: Partial<CustomerInput>, tx: Prisma.TransactionClient = db) {
-    return tx.customer.update({ where: { id }, data });
+  /** `companyId` in the filter guarantees a row of another company is never touched. */
+  async update(
+    companyId: string,
+    id: string,
+    data: Partial<CustomerInput>,
+    actorId: ActorId,
+    client: DbClient = db,
+  ) {
+    await client.customer.updateMany({
+      where: { id, companyId, deletedAt: null },
+      data: { ...data, ...updatedBy(actorId) },
+    });
+    return client.customer.findFirst({ where: { id, companyId } });
   },
 
-  softDelete(id: string, tx: Prisma.TransactionClient = db) {
-    return tx.customer.update({ where: { id }, data: { deletedAt: new Date() } });
+  softDelete(companyId: string, id: string, actorId: ActorId, client: DbClient = db) {
+    return client.customer.updateMany({
+      where: { id, companyId, deletedAt: null },
+      data: { deletedAt: new Date(), ...updatedBy(actorId) },
+    });
   },
 };

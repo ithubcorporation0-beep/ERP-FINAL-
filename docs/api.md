@@ -4,13 +4,30 @@ All endpoints live under `/api`, use JSON, and authenticate with the `erp_sessio
 
 ## Errors
 
-| Status | Meaning                                        |
-| ------ | ---------------------------------------------- |
-| 401    | Not signed in                                  |
-| 403    | Missing permission / no access to organization |
-| 404    | Not found (or belongs to another organization) |
-| 422    | Validation failed — body contains `issues`     |
-| 501    | Endpoint not implemented yet                   |
+Every error has the same shape and an `x-request-id` header:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "Some fields are invalid.",
+    "details": { "name": ["Too small: expected string to have >=1 characters"] },
+    "requestId": "511203f7-…"
+  }
+}
+```
+
+| Status | `code`              | Meaning                                                    |
+| ------ | ------------------- | ---------------------------------------------------------- |
+| 401    | `UNAUTHENTICATED`   | Not signed in, or wrong credentials                        |
+| 403    | `FORBIDDEN`         | Missing permission / no access to the company              |
+| 404    | `NOT_FOUND`         | Not found, malformed id, or belongs to another company     |
+| 409    | `CONFLICT`          | Duplicate or still-referenced data                         |
+| 422    | `VALIDATION_FAILED` | Invalid input; `details` lists the problems per field      |
+| 500    | `INTERNAL`          | Unexpected error — quote the `requestId` when reporting it |
+| 501    | —                   | Endpoint not implemented yet                               |
+
+Ids are UUIDs (v7). The company is always taken from the signed-in user's membership, never from the request.
 
 ## Auth
 
@@ -30,7 +47,7 @@ All endpoints live under `/api`, use JSON, and authenticate with the `erp_sessio
 | PATCH  | `/api/customers/:id`                     | `customers:update` |
 | DELETE | `/api/customers/:id` (soft delete)       | `customers:delete` |
 
-List responses: `{ items, total, page, pageSize }`.
+List responses: `{ items, total, page, pageSize }`. Records include `companyId`, `createdAt`, `updatedAt`, `createdById`, `updatedById`.
 
 ## Planned
 

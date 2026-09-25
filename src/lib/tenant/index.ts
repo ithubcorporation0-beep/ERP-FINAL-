@@ -1,48 +1,40 @@
-import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
+import { ForbiddenError, UnauthenticatedError } from "@/lib/errors";
 import { hasPermission, type Action, type Module } from "@/lib/permissions";
+import { membershipRepository } from "@/server/repositories/membership.repository";
 
-export class HttpError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-
+/** Who is acting, in which company, with which permissions. Passed to every service call. */
 export interface TenantContext {
   userId: string;
-  organizationId: string;
+  companyId: string;
+  roleId: string;
   permissions: string[];
 }
 
 /**
- * Resolves the signed-in user's active organization and permissions.
- * Every service call must go through this so queries are always scoped by `organizationId`.
+ * Resolves the signed-in user's company and permissions (server-side only).
+ * Every service call must receive this so queries are always scoped by `companyId`.
  */
-export async function requireTenant(organizationId?: string): Promise<TenantContext> {
+export async function requireTenant(companyId?: string): Promise<TenantContext> {
   const user = await getCurrentUser();
-  if (!user) throw new HttpError(401, "Not authenticated");
+  if (!user) throw new UnauthenticatedError();
 
-  const membership = await db.membership.findFirst({
-    where: { userId: user.id, ...(organizationId ? { organizationId } : {}) },
-    include: { role: true },
-    orderBy: { createdAt: "asc" },
-  });
-  if (!membership) throw new HttpError(403, "No access to this organization");
+  const access = await membershipRepository.findAccess(user.id, companyId);
+  if (!access) throw new ForbiddenError("You don't have access to this company.");
 
   return {
     userId: user.id,
-    organizationId: membership.organizationId,
-    permissions: membership.role.permissions,
+    companyId: access.companyId,
+    roleId: access.roleId,
+    permissions: access.permissions,
   };
 }
 
-export async function requirePermission(module: Module, action: Action, organizationId?: string) {
-  const ctx = await requireTenant(organizationId);
+/** `requireTenant` plus a permission check. Throws ForbiddenError when the permission is missing. */
+export async function requirePermission(module: Module, action: Action, companyId?: string) {
+  const ctx = await requireTenant(companyId);
   if (!hasPermission(ctx.permissions, `${module}:${action}`)) {
-    throw new HttpError(403, `Missing permission ${module}:${action}`);
+    throw new ForbiddenError(`You don't have permission to ${action} ${module}.`);
   }
   return ctx;
 }

@@ -24,4 +24,10 @@ describe("parseServerEnv", () => {
     expect(() => parseServerEnv({ DATABASE_URL: secret })).toThrow(/postgresql:\/\//);
     expect(() => parseServerEnv({ DATABASE_URL: secret })).not.toThrow(/hunter2/);
   });
+
+  it("accepts a known LOG_LEVEL, treats empty as unset and rejects unknown levels", () => {
+    expect(parseServerEnv({ ...valid, LOG_LEVEL: "warn" }).LOG_LEVEL).toBe("warn");
+    expect(parseServerEnv({ ...valid, LOG_LEVEL: "" }).LOG_LEVEL).toBeUndefined();
+    expect(() => parseServerEnv({ ...valid, LOG_LEVEL: "loud" })).toThrow(/LOG_LEVEL/);
+  });
 });

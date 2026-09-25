@@ -16,10 +16,10 @@ export function Header({ shell }: { shell: ShellContext }) {
       <div
         className="hidden min-w-0 items-center gap-2 text-sm font-medium lg:flex"
         title="Current company"
-        aria-label={`Current company: ${shell.organization.name}`}
+        aria-label={`Current company: ${shell.company.name}`}
       >
         <Building2 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <span className="truncate">{shell.organization.name}</span>
+        <span className="truncate">{shell.company.name}</span>
       </div>
       <span aria-hidden="true" className="mx-2 hidden h-5 w-px shrink-0 bg-border lg:block" />
 
@@ -29,7 +29,7 @@ export function Header({ shell }: { shell: ShellContext }) {
 
       <div className="flex items-center gap-1">
         <NotificationsButton unread={shell.unreadNotifications} />
-        <UserMenu user={shell.user} organizationName={shell.organization.name} />
+        <UserMenu user={shell.user} companyName={shell.company.name} />
       </div>
     </header>
   );

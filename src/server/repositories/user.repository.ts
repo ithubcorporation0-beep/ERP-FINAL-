@@ -1,15 +1,30 @@
 import { db } from "@/lib/db";
+import { createdBy, type ActorId, type DbClient } from "./helpers";
 
 export const userRepository = {
-  findProfile(id: string) {
-    return db.user.findUnique({ where: { id }, select: { id: true, name: true, email: true } });
+  findByEmail(email: string, client: DbClient = db) {
+    return client.user.findUnique({ where: { email: email.toLowerCase() } });
   },
 
-  findByEmail(email: string) {
-    return db.user.findUnique({ where: { email: email.toLowerCase() } });
+  findProfile(id: string, client: DbClient = db) {
+    return client.user.findUnique({
+      where: { id },
+      select: { id: true, name: true, email: true, status: true },
+    });
   },
 
-  touchLastLogin(id: string) {
-    return db.user.update({ where: { id }, data: { lastLoginAt: new Date() } });
+  create(
+    data: { email: string; name: string; passwordHash: string },
+    actorId: ActorId,
+    client: DbClient = db,
+  ) {
+    return client.user.create({
+      data: { ...data, email: data.email.toLowerCase(), ...createdBy(actorId) },
+      select: { id: true, name: true, email: true, status: true },
+    });
+  },
+
+  touchLastLogin(id: string, client: DbClient = db) {
+    return client.user.update({ where: { id }, data: { lastLoginAt: new Date() }, select: { id: true } });
   },
 };

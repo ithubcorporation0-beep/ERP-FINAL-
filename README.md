@@ -3,7 +3,7 @@
 A multi-company ERP (CRM, sales, finance, HR, payroll, projects, inventory, reports) built with
 **Next.js 16, TypeScript, Tailwind CSS, shadcn/ui, Prisma 7 and PostgreSQL**.
 
-> **Status:** Phase 01 — UI and UX design system. ERP modules are built phase by phase; see
+> **Status:** Phase 02 — database and backend foundation. ERP modules are built phase by phase; see
 > [MASTER-ERP-BUILD-PLAN.md](MASTER-ERP-BUILD-PLAN.md).
 
 ## Prerequisites
@@ -17,7 +17,7 @@ A multi-company ERP (CRM, sales, finance, HR, payroll, projects, inventory, repo
 cp .env.example .env     # 1. create your local settings file, then edit DATABASE_URL
 npm install              # 2. install dependencies (also generates the Prisma client)
 npm run db:deploy        # 3. create the database tables
-npm run db:seed          # 4. demo company + admin (set SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD in .env first)
+npm run db:seed          # 4. first company + Owner account (set SEED_* in .env first; no fake data)
 npm run dev              # 5. open http://localhost:3000 and sign in as the seed admin
 ```
 
