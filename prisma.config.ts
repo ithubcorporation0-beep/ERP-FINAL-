@@ -8,4 +8,8 @@ export default defineConfig({
     path: path.join("prisma", "migrations"),
     seed: "tsx prisma/seed.ts",
   },
+  datasource: {
+    // Read lazily so `prisma generate` works without a database (e.g. in CI installs).
+    url: process.env.DATABASE_URL ?? "",
+  },
 });

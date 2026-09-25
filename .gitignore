@@ -13,3 +13,11 @@ next-env.d.ts
 npm-debug.log*
 .DS_Store
 .vercel
+
+# Prisma generated client (rebuilt by `prisma generate` on install)
+/src/generated/
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/

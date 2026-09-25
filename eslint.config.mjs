@@ -1,12 +1,58 @@
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { FlatCompat } from "@eslint/eslintrc";
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+import prettier from "eslint-config-prettier/flat";
 
-const compat = new FlatCompat({ baseDirectory: dirname(fileURLToPath(import.meta.url)) });
+export default defineConfig([
+  ...nextVitals,
+  ...nextTs,
+  // Must stay last: turns off stylistic rules that Prettier owns.
+  prettier,
 
-const eslintConfig = [
-  { ignores: [".next/**", "node_modules/**", "next-env.d.ts", "prisma/migrations/**"] },
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
-];
+  globalIgnores([
+    ".next/**",
+    "out/**",
+    "build/**",
+    "coverage/**",
+    "next-env.d.ts",
+    "src/generated/**",
+    "prisma/migrations/**",
+    "playwright-report/**",
+    "test-results/**",
+  ]),
 
-export default eslintConfig;
+  // Machine-checked versions of the rules in AGENTS.md.
+  {
+    rules: {
+      "@typescript-eslint/no-explicit-any": "error", // rule 7
+      "@typescript-eslint/ban-ts-comment": [
+        "error",
+        { "ts-ignore": true, "ts-expect-error": true, "ts-nocheck": true },
+      ], // rule 6
+      "no-empty": ["error", { allowEmptyCatch: false }], // rule 5
+    },
+  },
+  {
+    // Rule 9: UI must not reach the database directly — go through server actions/services.
+    files: ["src/components/**", "src/features/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "@/lib/db",
+                "@/lib/db/*",
+                "@/generated/prisma",
+                "@/generated/prisma/*",
+                "@/server/repositories/*",
+              ],
+              message: "UI components must not access the database. Use a server action or service.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+]);

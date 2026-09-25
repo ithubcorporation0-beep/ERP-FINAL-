@@ -10,14 +10,14 @@ Role-based access control, defined in `src/lib/permissions`.
 
 ## Default roles (seeded)
 
-| Role        | Access |
-|-------------|--------|
-| Owner       | `*` |
-| Admin       | Everything except settings |
-| Accountant  | Invoices, payments, expenses, accounting; read reports & customers |
-| HR Manager  | Employees, attendance, leaves, payroll; read reports |
-| Sales Rep   | Customers, leads; read/create invoices; read products |
-| Employee    | Own attendance & leave requests; read/update tasks; read projects |
+| Role       | Access                                                             |
+| ---------- | ------------------------------------------------------------------ |
+| Owner      | `*`                                                                |
+| Admin      | Everything except settings                                         |
+| Accountant | Invoices, payments, expenses, accounting; read reports & customers |
+| HR Manager | Employees, attendance, leaves, payroll; read reports               |
+| Sales Rep  | Customers, leads; read/create invoices; read products              |
+| Employee   | Own attendance & leave requests; read/update tasks; read projects  |
 
 ## Enforcing
 

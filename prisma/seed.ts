@@ -1,9 +1,11 @@
 import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "../src/generated/prisma/client";
 import { hashPassword } from "../src/lib/auth/password";
 import { DEFAULT_ROLES } from "../src/lib/permissions";
 
-const db = new PrismaClient();
+if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL must be set to run the seed.");
+const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 
 const CHART_OF_ACCOUNTS = [
   { code: "1000", name: "Cash", type: "ASSET" },
@@ -48,7 +50,9 @@ async function main() {
     });
   }
 
-  const owner = await db.role.findUniqueOrThrow({ where: { organizationId_name: { organizationId: org.id, name: "Owner" } } });
+  const owner = await db.role.findUniqueOrThrow({
+    where: { organizationId_name: { organizationId: org.id, name: "Owner" } },
+  });
   const user = await db.user.upsert({
     where: { email },
     update: {},

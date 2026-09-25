@@ -1,12 +1,26 @@
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+
+interface ErrorStateProps {
+  title?: string;
+  message: string;
+  onRetry?: () => void;
+}
+
+export function ErrorState({ title = "Something went wrong", message, onRetry }: ErrorStateProps) {
   return (
-    <div role="alert" style={{ padding: 16, border: "1px solid crimson", borderRadius: 8 }}>
-      <p style={{ margin: 0 }}>{message}</p>
-      {onRetry ? (
-        <button type="button" onClick={onRetry} style={{ marginTop: 8 }}>
-          Try again
-        </button>
-      ) : null}
-    </div>
+    <Alert variant="destructive">
+      <AlertCircle aria-hidden="true" />
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription>
+        <p>{message}</p>
+        {onRetry ? (
+          <Button type="button" variant="outline" size="sm" className="mt-2" onClick={onRetry}>
+            Try again
+          </Button>
+        ) : null}
+      </AlertDescription>
+    </Alert>
   );
 }

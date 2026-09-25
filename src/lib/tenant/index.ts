@@ -32,7 +32,11 @@ export async function requireTenant(organizationId?: string): Promise<TenantCont
   });
   if (!membership) throw new HttpError(403, "No access to this organization");
 
-  return { userId: user.id, organizationId: membership.organizationId, permissions: membership.role.permissions };
+  return {
+    userId: user.id,
+    organizationId: membership.organizationId,
+    permissions: membership.role.permissions,
+  };
 }
 
 export async function requirePermission(module: Module, action: Action, organizationId?: string) {

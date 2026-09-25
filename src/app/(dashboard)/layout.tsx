@@ -1,15 +1,15 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth/session";
 import { Sidebar } from "@/components/layout/sidebar";
+import { getCurrentUser } from "@/lib/auth/session";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
+    <div className="flex min-h-svh">
       <Sidebar userName={user.name} />
-      <main style={{ flex: 1, padding: 24 }}>{children}</main>
+      <main className="flex-1 p-6">{children}</main>
     </div>
   );
 }

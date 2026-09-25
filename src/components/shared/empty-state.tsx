@@ -1,8 +1,20 @@
-export function EmptyState({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
+import { Inbox, type LucideIcon } from "lucide-react";
+
+interface EmptyStateProps {
+  title: string;
+  description?: string;
+  icon?: LucideIcon;
+  action?: React.ReactNode;
+}
+
+export function EmptyState({ title, description, icon: Icon = Inbox, action }: EmptyStateProps) {
   return (
-    <section style={{ padding: 32, textAlign: "center", border: "1px dashed var(--border)", borderRadius: 8 }}>
-      <h2 style={{ margin: 0, fontSize: 18 }}>{title}</h2>
-      {description ? <p style={{ color: "var(--muted)" }}>{description}</p> : null}
+    <section className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-10 text-center">
+      <Icon className="size-8 text-muted-foreground" aria-hidden="true" />
+      <div className="space-y-1">
+        <h2 className="text-base font-medium">{title}</h2>
+        {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+      </div>
       {action}
     </section>
   );

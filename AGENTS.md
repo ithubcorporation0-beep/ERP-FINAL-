@@ -30,14 +30,16 @@ Read `docs/architecture.md` before starting work.
 
 ## Where things go
 
-| Concern | Location |
-|---------|----------|
-| Prisma queries | `src/server/repositories/*.repository.ts` — only place that calls `db.<model>` for business data |
-| Business rules, transactions, audit | `src/server/services/*.service.ts` |
-| Route handlers / server actions | `src/app/api/**`, `src/server/actions/**` — parse → authorize → call service |
-| Zod schemas | `src/lib/validation` |
-| Shared UI | `src/components/**` — no data access |
-| Module UI | `src/features/<module>` |
+| Concern                             | Location                                                                                         |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Prisma queries                      | `src/server/repositories/*.repository.ts` — only place that calls `db.<model>` for business data |
+| Business rules, transactions, audit | `src/server/services/*.service.ts`                                                               |
+| Route handlers / server actions     | `src/app/api/**`, `src/server/actions/**` — parse → authorize → call service                     |
+| Zod schemas                         | `src/lib/validation` (env vars: `src/lib/env/schema.ts`)                                         |
+| Prisma types                        | `@/generated/prisma/client` (generated, never edit)                                              |
+| shadcn/ui primitives                | `src/components/ui` — add with `npx shadcn@latest add <name>`                                    |
+| Shared UI                           | `src/components/**` — no data access (ESLint enforces this)                                      |
+| Module UI                           | `src/features/<module>`                                                                          |
 
 Reference implementation: the `customers` module.
 
@@ -56,4 +58,5 @@ npm run test
 npm run build
 ```
 
-Also run `npx prisma validate` whenever `prisma/schema.prisma` changes.
+Also run `npx prisma validate` whenever `prisma/schema.prisma` changes, and commit the new
+migration created by `npm run db:migrate`. `npm run format` fixes formatting failures reported by lint.

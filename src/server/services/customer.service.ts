@@ -18,7 +18,11 @@ export const customerService = {
   create(ctx: TenantContext, input: CustomerInput) {
     return db.$transaction(async (tx) => {
       const customer = await customerRepository.create(ctx.organizationId, input, tx);
-      await writeAuditLog(ctx, { action: "create", entityType: "Customer", entityId: customer.id, after: customer }, tx);
+      await writeAuditLog(
+        ctx,
+        { action: "create", entityType: "Customer", entityId: customer.id, after: customer },
+        tx,
+      );
       return customer;
     });
   },

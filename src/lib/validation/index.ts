@@ -15,8 +15,8 @@ export const customerSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.email(),
-  password: z.string().min(1),
+  email: z.email("Enter a valid email address."),
+  password: z.string().min(1, "Enter your password."),
 });
 
 export type PaginationInput = z.infer<typeof paginationSchema>;

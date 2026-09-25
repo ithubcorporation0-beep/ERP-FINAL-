@@ -2,12 +2,13 @@
 // Every business record carries `organizationId`; see docs/database.md.
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
+// The connection URL lives in prisma.config.ts (Prisma 7).
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ─── Tenancy & Auth ──────────────────────────────────────────

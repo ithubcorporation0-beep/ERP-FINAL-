@@ -9,7 +9,8 @@ export function handle<A extends unknown[]>(fn: (...args: A) => Promise<Response
       return await fn(...args);
     } catch (err) {
       if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
-      if (err instanceof ZodError) return NextResponse.json({ error: "Validation failed", issues: err.issues }, { status: 422 });
+      if (err instanceof ZodError)
+        return NextResponse.json({ error: "Validation failed", issues: err.issues }, { status: 422 });
       console.error(err);
       return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }

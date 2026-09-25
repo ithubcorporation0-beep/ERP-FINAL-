@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import type { CustomerInput, PaginationInput } from "@/lib/validation";
 
@@ -10,7 +10,12 @@ export const customerRepository = {
       ...(search ? { name: { contains: search, mode: "insensitive" } } : {}),
     };
     const [items, total] = await Promise.all([
-      db.customer.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
+      db.customer.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
       db.customer.count({ where }),
     ]);
     return { items, total, page, pageSize };
