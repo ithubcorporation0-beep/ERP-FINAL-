@@ -25,7 +25,7 @@ Read `docs/architecture.md` before starting work.
 18. Use accessible UI components (labels on inputs, semantic elements, keyboard support, `role="alert"` for errors).
 19. Keep components small and reusable.
 20. Do not proceed to the next phase automatically — stop and report when a phase is done.
-21. After every phase, run the checks below and commit.
+21. After every phase, run the checks below and commit using that phase's commit message.
 22. Update documentation (`docs/`, `MASTER-ERP-BUILD-PLAN.md`) when architecture changes.
 
 ## Where things go
@@ -41,12 +41,19 @@ Read `docs/architecture.md` before starting work.
 
 Reference implementation: the `customers` module.
 
+## Phases and commits
+
+The roadmap is `MASTER-ERP-BUILD-PLAN.md`: 16 phases, each committed as
+`feat(phase-NN): <description>` using the exact message listed there. Work only on the phase you
+were asked to do, and update its status in the plan in the same commit.
+
 ## Checks (must pass before every commit)
 
 ```bash
-npx prisma validate
 npm run lint
 npm run typecheck
-npm test
+npm run test
 npm run build
 ```
+
+Also run `npx prisma validate` whenever `prisma/schema.prisma` changes.
