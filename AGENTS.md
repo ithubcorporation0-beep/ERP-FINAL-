@@ -43,6 +43,13 @@ Read `docs/architecture.md` before starting work.
 
 Reference implementation: the `customers` module.
 
+## Framework versions
+
+This project uses current major versions (Next.js 16, React 19, Prisma 7, Tailwind 4, TanStack Table 9,
+Zod 4) that may differ from an AI model's training data. Before using an unfamiliar API, read the docs
+bundled with the installed package: `node_modules/next/dist/docs/`, and the `skills/` folders in
+`node_modules/@tanstack/react-table` and `node_modules/@tanstack/table-core`. See `docs/decisions.md`.
+
 ## Phases and commits
 
 The roadmap is `MASTER-ERP-BUILD-PLAN.md`: 16 phases, each committed as

@@ -3,63 +3,54 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { FormField } from "@/components/forms/form-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { loginSchema, type LoginInput } from "@/lib/validation";
 import { loginAction } from "@/server/actions/auth.actions";
 
 export function LoginForm() {
-  const {
-    register,
-    handleSubmit,
-    setError,
-    formState: { errors, isSubmitting },
-  } = useForm<LoginInput>({
+  const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
+  const { errors, isSubmitting } = form.formState;
 
   async function onSubmit(values: LoginInput) {
     const result = await loginAction(values);
-    if (result?.error) setError("root", { message: result.error });
+    if (result?.error) form.setError("root", { message: result.error });
   }
 
   return (
-    <Card className="w-full max-w-sm">
+    <Card className="w-full max-w-sm shadow-sm">
       <CardHeader>
         <CardTitle>
-          <h1>Sign in</h1>
+          <h1 className="text-lg">Sign in</h1>
         </CardTitle>
         <CardDescription>Use your company account to continue.</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} noValidate>
+        <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
           <FieldGroup>
-            <Field data-invalid={Boolean(errors.email)}>
-              <FieldLabel htmlFor="email">Email</FieldLabel>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                aria-invalid={Boolean(errors.email)}
-                {...register("email")}
-              />
-              <FieldError errors={[errors.email]} />
-            </Field>
-            <Field data-invalid={Boolean(errors.password)}>
-              <FieldLabel htmlFor="password">Password</FieldLabel>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                aria-invalid={Boolean(errors.password)}
-                {...register("password")}
-              />
-              <FieldError errors={[errors.password]} />
-            </Field>
+            <FormField
+              control={form.control}
+              name="email"
+              label="Email"
+              render={({ field, control }) => (
+                <Input type="email" autoComplete="email" {...field} {...control} />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              label="Password"
+              render={({ field, control }) => (
+                <Input type="password" autoComplete="current-password" {...field} {...control} />
+              )}
+            />
             {errors.root ? (
               <Alert variant="destructive">
                 <AlertDescription>{errors.root.message}</AlertDescription>

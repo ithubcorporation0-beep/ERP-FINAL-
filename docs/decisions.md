@@ -87,3 +87,22 @@ before serving traffic. Error messages name the variable but never print its val
 - **Playwright** for end-to-end tests against the real production build (`next start`) in CI.
 - `server-only` is aliased to an empty module in Vitest so server code can be unit-tested directly.
 - `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` optionally points Playwright at an already-installed Chromium.
+
+## ADR-013: UI and UX design system (phase 01)
+
+- **Tokens, not hard-coded colors.** Slate neutrals + one blue brand color + five status tones, all CSS
+  variables with light and dark values. A unit test enforces WCAG AA contrast for every text pair.
+- **Dark mode via `next-themes`** (class strategy, default = system). It only toggles a `.dark` class;
+  components need no dark-specific code.
+- **TanStack Table v9.** v9 became the stable release in August 2026 (v8 is no longer updated). v9
+  registers features explicitly, so all tables share one feature set in `data-table-features.ts` and
+  build columns with `createDataTableColumns<T>()`. The column-list type is derived from TanStack's
+  own `ColumnHelper`, so project code never writes `any`.
+- **Navigation as data.** One config drives sidebar, mobile menu, search and breadcrumbs; the server
+  filters it by role. A unit test checks every entry has a page.
+- **Honest placeholders.** Unbuilt modules show `ModulePlaceholder` — no fake figures and no buttons
+  that pretend to work. The component gallery at `/design-system` is development-only and labels all
+  of its content as sample data.
+- **`agentRules: false` in `next.config.ts`.** Next.js 16's dev server appends its own block to
+  `AGENTS.md`/`CLAUDE.md` on every run. `AGENTS.md` is our binding rules file, so the equivalent
+  advice ("read the docs bundled in `node_modules`") is written there by us instead.

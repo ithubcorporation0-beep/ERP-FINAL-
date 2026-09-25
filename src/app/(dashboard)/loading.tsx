@@ -1,5 +1,5 @@
-import { LoadingState } from "@/components/shared/loading-state";
+import { PageSkeleton } from "@/components/shared/skeletons";
 
 export default function Loading() {
-  return <LoadingState />;
+  return <PageSkeleton />;
 }

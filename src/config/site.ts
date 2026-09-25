@@ -1,4 +1,5 @@
 export const siteConfig = {
   name: "IT Hub ERP",
-  description: "Multi-tenant ERP: CRM, sales, finance, HR, projects and inventory.",
+  shortName: "IT Hub",
+  description: "Multi-company ERP: CRM, sales, finance, HR, payroll, projects and inventory.",
 };

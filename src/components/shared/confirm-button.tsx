@@ -1,55 +1,28 @@
 "use client";
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog, type ConfirmDialogProps } from "./confirm-dialog";
 
-interface ConfirmButtonProps {
+interface ConfirmButtonProps extends Omit<ConfirmDialogProps, "trigger" | "open" | "onOpenChange"> {
   label: string;
-  title: string;
-  description: string;
-  confirmLabel?: string;
-  onConfirm: () => void | Promise<void>;
   disabled?: boolean;
 }
 
-/** Destructive-action button: `onConfirm` runs only after the user confirms in a modal dialog. */
-export function ConfirmButton({
-  label,
-  title,
-  description,
-  confirmLabel = "Confirm",
-  onConfirm,
-  disabled,
-}: ConfirmButtonProps) {
+/** A destructive button that opens a `ConfirmDialog`; `onConfirm` runs only after confirmation. */
+export function ConfirmButton({ label, disabled, tone = "destructive", ...dialog }: ConfirmButtonProps) {
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button type="button" variant="destructive" disabled={disabled}>
+    <ConfirmDialog
+      {...dialog}
+      tone={tone}
+      trigger={
+        <Button
+          type="button"
+          variant={tone === "destructive" ? "destructive" : "default"}
+          disabled={disabled}
+        >
           {label}
         </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={() => void onConfirm()}>
-            {confirmLabel}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+      }
+    />
   );
 }

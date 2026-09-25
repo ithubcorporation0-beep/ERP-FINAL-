@@ -12,3 +12,12 @@ export function formatCurrency(amount: number | string, currency = "USD", locale
 export function roundMoney(value: number): number {
   return (Math.sign(value) * Math.round((Math.abs(value) + Number.EPSILON) * 100)) / 100;
 }
+
+/** "Ada Lovelace" → "AL", "admin" → "AD". Used for avatar fallbacks. */
+export function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const first = parts[0] ?? "";
+  const last = parts.length > 1 ? (parts.at(-1) ?? "") : "";
+  const letters = last ? `${first.charAt(0)}${last.charAt(0)}` : first.slice(0, 2);
+  return letters.toUpperCase() || "?";
+}

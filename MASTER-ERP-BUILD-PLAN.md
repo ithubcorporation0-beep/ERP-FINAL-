@@ -13,7 +13,7 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 | #   | Commit message                                                    | Status |
 | --- | ----------------------------------------------------------------- | ------ |
 | 00  | `chore(phase-00): initialize ERP project foundation`              | ✅     |
-| 01  | `feat(phase-01): establish ERP UI foundation`                     | ⬜     |
+| 01  | `feat(phase-01): establish ERP UI and UX design system`           | ✅     |
 | 02  | `feat(phase-02): establish application foundation`                | 🟡     |
 | 03  | `feat(phase-03): implement authentication and RBAC`               | 🟡     |
 | 04  | `feat(phase-04): implement multi-tenant company foundation`       | 🟡     |
@@ -49,13 +49,16 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 - ✅ CI: Postgres service, migrations, lint, typecheck, test, build, e2e
 - ✅ Docs: README, architecture, database, deployment, decisions
 
-## Phase 01 — ERP UI foundation
+## Phase 01 — ERP UI and UX design system
 
-- ✅ Tailwind CSS + shadcn/ui kit (done in phase 00)
-- ✅ Shared states: `LoadingState`, `EmptyState`, `ErrorState`, `SuccessMessage`, `ConfirmButton` (on shadcn)
-- ⬜ App shell: responsive/mobile sidebar, top bar, breadcrumbs, active link state
-- ⬜ Dark mode toggle (tokens already exist in `globals.css`)
-- ⬜ Reusable data table (sorting, pagination, search) and form primitives
+- ✅ Visual language: enterprise palette, status colors, typography, spacing, radius, shadows, dark mode
+- ✅ Accessible contrast enforced by a unit test (WCAG AA, both themes)
+- ✅ App shell: sidebar, header (company, global search, notifications, user menu), breadcrumbs
+- ✅ Responsive mobile navigation (slide-out menu), verified at 390px, 834px and 1440px
+- ✅ Components: PageHeader, KpiCard, DataTable, Pagination, SearchInput, FilterBar, Modal, ConfirmDialog,
+  StatusBadge, FormField, DatePicker, SelectInput, Tabs, dropdown menus, toasts, skeletons, states
+- ✅ Placeholder navigation for all modules, filtered by role; honest "not available yet" pages
+- ✅ Dev-only component reference at `/design-system`; docs in `docs/design-system.md`
 
 ## Phase 02 — Application foundation
 

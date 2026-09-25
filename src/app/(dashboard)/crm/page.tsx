@@ -1,5 +1,8 @@
-import { PageHeader } from "@/components/shared/page-header";
+import type { Metadata } from "next";
+import { ModulePlaceholder } from "@/components/shared/module-placeholder";
+
+export const metadata: Metadata = { title: "CRM" };
 
 export default function CRMPage() {
-  return <PageHeader title="CRM" />;
+  return <ModulePlaceholder href="/crm" />;
 }

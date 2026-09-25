@@ -1,15 +1,15 @@
 import { redirect } from "next/navigation";
-import { Sidebar } from "@/components/layout/sidebar";
-import { getCurrentUser } from "@/lib/auth/session";
+import { AppShell } from "@/components/layout/app-shell";
+import { HttpError, requireTenant } from "@/lib/tenant";
+import { shellService } from "@/server/services/shell.service";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  const ctx = await requireTenant().catch((error: unknown) => {
+    // Signed out or session expired → login. Any other failure surfaces in the error boundary.
+    if (error instanceof HttpError && error.status === 401) redirect("/login");
+    throw error;
+  });
+  const shell = await shellService.getContext(ctx);
 
-  return (
-    <div className="flex min-h-svh">
-      <Sidebar userName={user.name} />
-      <main className="flex-1 p-6">{children}</main>
-    </div>
-  );
+  return <AppShell shell={shell}>{children}</AppShell>;
 }

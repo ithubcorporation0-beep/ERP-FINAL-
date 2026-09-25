@@ -29,6 +29,9 @@ jobs:
       DATABASE_URL: postgresql://erp:erp@localhost:5432/it_hub_erp?schema=public
       APP_URL: http://localhost:3000
       NEXT_TELEMETRY_DISABLED: 1
+      # CI-only throwaway credentials for the seeded admin used by the e2e tests.
+      SEED_ADMIN_EMAIL: e2e-admin@example.com
+      SEED_ADMIN_PASSWORD: ci-only-password-123
 
     steps:
       - uses: actions/checkout@v4
@@ -41,6 +44,8 @@ jobs:
       - run: npx prisma validate
       - name: Apply migrations to a fresh database
         run: npx prisma migrate deploy
+      - name: Seed the database
+        run: npm run db:seed
 
       - run: npm run lint
       - run: npm run typecheck
