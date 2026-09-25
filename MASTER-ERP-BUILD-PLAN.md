@@ -1,5 +1,7 @@
 # Master ERP Build Plan
 
+Work one phase at a time. After each phase: run the checks in `AGENTS.md`, commit, and stop for review.
+
 Status legend: ✅ done · 🟡 scaffolded · ⬜ not started
 
 ## Phase 0 — Foundation
@@ -8,6 +10,7 @@ Status legend: ✅ done · 🟡 scaffolded · ⬜ not started
 - ✅ Multi-tenant context (`requireTenant`) and RBAC (`requirePermission`)
 - ✅ Database sessions, login/logout
 - ✅ Audit logging helper
+- ✅ Agent rules (`AGENTS.md`), shared loading/empty/error/success states, confirm dialog
 - ✅ Seed: organization, default roles, chart of accounts, admin
 - ⬜ Initial migration (`npm run db:migrate -- --name init` against a real database)
 - ⬜ UI kit (shadcn/ui + Tailwind) in `src/components/ui`

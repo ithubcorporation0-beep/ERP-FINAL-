@@ -21,3 +21,4 @@ export const loginSchema = z.object({
 
 export type PaginationInput = z.infer<typeof paginationSchema>;
 export type CustomerInput = z.infer<typeof customerSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;

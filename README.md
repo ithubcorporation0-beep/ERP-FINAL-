@@ -34,5 +34,7 @@ tests/             unit, integration, e2e
 docs/              architecture, database, permissions, deployment, api, decisions
 ```
 
+**Contributing (humans and AI agents): read [AGENTS.md](AGENTS.md) first.**
+
 See [docs/architecture.md](docs/architecture.md) for how the layers fit together, and
 [MASTER-ERP-BUILD-PLAN.md](MASTER-ERP-BUILD-PLAN.md) for the roadmap.

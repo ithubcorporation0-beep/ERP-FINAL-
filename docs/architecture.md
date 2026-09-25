@@ -22,6 +22,23 @@ Rules:
    `ctx.organizationId` to repositories. A repository function with no `organizationId` argument is a bug.
 3. Every mutation writes an `AuditLog` row in the same transaction.
 4. Input is validated with Zod schemas in `src/lib/validation`.
+5. Authentication is also a service (`auth.service.ts`); both the login server action and
+   `POST /api/auth/login` call it, so the credential check exists once.
+
+The full rule set every contributor and AI agent must follow is in [`AGENTS.md`](../AGENTS.md).
+
+## UI states
+
+Every module page must handle loading, empty, error and success states, and every destructive
+action must be confirmed. Use the shared components in `src/components/shared`:
+
+| Component | Use |
+|-----------|-----|
+| `LoadingState` | Suspense/loading fallback (`(dashboard)/loading.tsx` covers route transitions) |
+| `EmptyState` | A list with no records, with an optional call to action |
+| `ErrorState` | Recoverable errors, with retry (`(dashboard)/error.tsx` is the route-level boundary) |
+| `SuccessMessage` | Confirmation after a mutation |
+| `ConfirmButton` | Required wrapper for delete/void/other destructive actions |
 
 ## Reference module
 

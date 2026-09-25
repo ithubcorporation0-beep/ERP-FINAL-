@@ -19,8 +19,12 @@ const CHART_OF_ACCOUNTS = [
 ] as const;
 
 async function main() {
-  const email = (process.env.SEED_ADMIN_EMAIL ?? "admin@example.com").toLowerCase();
-  const password = process.env.SEED_ADMIN_PASSWORD ?? "ChangeMe123!";
+  const email = process.env.SEED_ADMIN_EMAIL?.toLowerCase();
+  const password = process.env.SEED_ADMIN_PASSWORD;
+  if (!email || !password) {
+    throw new Error("SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must be set to seed the admin user.");
+  }
+  if (password.length < 12) throw new Error("SEED_ADMIN_PASSWORD must be at least 12 characters.");
 
   const org = await db.organization.upsert({
     where: { slug: "it-hub" },

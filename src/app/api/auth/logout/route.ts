@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { handle } from "@/lib/api";
-import { destroySession } from "@/lib/auth/session";
+import { authService } from "@/server/services/auth.service";
 
 export const POST = handle(async () => {
-  await destroySession();
+  await authService.logout();
   return new NextResponse(null, { status: 204 });
 });
