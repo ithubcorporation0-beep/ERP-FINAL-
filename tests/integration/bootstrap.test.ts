@@ -10,7 +10,7 @@ const input = {
 };
 
 describe("companyService.bootstrap (seed workflow)", () => {
-  it("creates the company, permission catalogue, built-in roles and an Owner with every permission", async () => {
+  it("creates the company, permission catalogue, built-in roles and a Super Admin with every permission", async () => {
     const result = await companyService.bootstrap(input);
     expect(result).toMatchObject({ createdCompany: true, createdOwner: true });
 
@@ -23,7 +23,7 @@ describe("companyService.bootstrap (seed workflow)", () => {
     expect(roles.every((role) => role.isSystem)).toBe(true);
 
     const access = await membershipRepository.findAccess(result.ownerId, result.company.id);
-    expect(access?.roleName).toBe("Owner");
+    expect(access?.roleName).toBe("Super Admin");
     expect(access?.permissions).toHaveLength(PERMISSION_CATALOG.length);
 
     const owner = await db.user.findUniqueOrThrow({ where: { id: result.ownerId } });

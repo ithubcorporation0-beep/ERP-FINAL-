@@ -64,6 +64,7 @@ model Company {
   auditLogs       AuditLog[]
   customers       Customer[]
   notifications   Notification[]
+  authTokens      AuthToken[]
 
   @@map("companies")
 }
@@ -79,22 +80,31 @@ enum UserStatus {
 }
 
 model User {
-  id           String     @id @default(uuid(7)) @db.Uuid
+  id                  String     @id @default(uuid(7)) @db.Uuid
   /// Stored lower-case.
-  email        String     @unique
-  name         String
-  passwordHash String     @map("password_hash")
-  status       UserStatus @default(ACTIVE)
-  lastLoginAt  DateTime?  @map("last_login_at") @db.Timestamptz(3)
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
-  createdById  String?    @map("created_by") @db.Uuid
-  updatedById  String?    @map("updated_by") @db.Uuid
+  email               String     @unique
+  name                String
+  passwordHash        String     @map("password_hash")
+  status              UserStatus @default(ACTIVE)
+  phone               String?
+  jobTitle            String?    @map("job_title")
+  /// Null until the user proves they own the address (verification or invitation link).
+  emailVerifiedAt     DateTime?  @map("email_verified_at") @db.Timestamptz(3)
+  passwordChangedAt   DateTime?  @map("password_changed_at") @db.Timestamptz(3)
+  /// Consecutive failed sign-ins; reset on success. Too many → `lockedUntil`.
+  failedLoginAttempts Int        @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime?  @map("locked_until") @db.Timestamptz(3)
+  lastLoginAt         DateTime?  @map("last_login_at") @db.Timestamptz(3)
+  createdAt           DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById         String?    @map("created_by") @db.Uuid
+  updatedById         String?    @map("updated_by") @db.Uuid
 
   createdBy User? @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   updatedBy User? @relation("UserUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
   sessions      Session[]
+  authTokens    AuthToken[]    @relation("AuthTokenUser")
   memberships   Membership[]   @relation("MembershipUser")
   notifications Notification[]
   auditLogs     AuditLog[]
@@ -113,26 +123,59 @@ model User {
   settingsUpdated        Setting[]        @relation("SettingUpdatedBy")
   customersCreated       Customer[]       @relation("CustomerCreatedBy")
   customersUpdated       Customer[]       @relation("CustomerUpdatedBy")
+  authTokensCreated      AuthToken[]      @relation("AuthTokenCreatedBy")
 
   @@map("users")
 }
 
 model Session {
-  id         String   @id @default(uuid(7)) @db.Uuid
-  userId     String   @map("user_id") @db.Uuid
+  id                String   @id @default(uuid(7)) @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
   /// SHA-256 of the cookie token; the token itself is never stored.
-  tokenHash  String   @unique @map("token_hash")
-  expiresAt  DateTime @map("expires_at") @db.Timestamptz(3)
-  ipAddress  String?  @map("ip_address")
-  userAgent  String?  @map("user_agent")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  lastUsedAt DateTime @default(now()) @map("last_used_at") @db.Timestamptz(3)
+  tokenHash         String   @unique @map("token_hash")
+  expiresAt         DateTime @map("expires_at") @db.Timestamptz(3)
+  ipAddress         String?  @map("ip_address")
+  userAgent         String?  @map("user_agent")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastUsedAt        DateTime @default(now()) @map("last_used_at") @db.Timestamptz(3)
+  /// Hard limit: the session can be extended by activity, but never beyond this.
+  absoluteExpiresAt DateTime @default(dbgenerated("(now() + '30 days'::interval)")) @map("absolute_expires_at") @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+enum AuthTokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  INVITATION
+
+  @@map("auth_token_type")
+}
+
+/// Single-use links sent by email. Only the SHA-256 hash of the token is stored.
+model AuthToken {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  userId      String        @map("user_id") @db.Uuid
+  type        AuthTokenType
+  tokenHash   String        @unique @map("token_hash")
+  /// For invitations: the company the user was invited to.
+  companyId   String?       @map("company_id") @db.Uuid
+  expiresAt   DateTime      @map("expires_at") @db.Timestamptz(3)
+  usedAt      DateTime?     @map("used_at") @db.Timestamptz(3)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?       @map("created_by") @db.Uuid
+
+  user      User     @relation("AuthTokenUser", fields: [userId], references: [id], onDelete: Cascade)
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation("AuthTokenCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([userId, type])
+  @@index([expiresAt])
+  @@map("auth_tokens")
 }
 
 // ─── Access control ──────────────────────────────────────────

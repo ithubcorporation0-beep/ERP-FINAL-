@@ -14,6 +14,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { visibleNavSections } from "@/config/navigation";
+import { NAV_ICONS } from "./nav-icons";
 
 /**
  * Global search (Ctrl/⌘ + K). Currently searches the pages the user can access; record search
@@ -72,13 +73,16 @@ export function GlobalSearch({ allowedHrefs }: { allowedHrefs: readonly string[]
             <CommandEmpty>No results found.</CommandEmpty>
             {visibleNavSections(allowedHrefs).map((section) => (
               <CommandGroup key={section.title} heading={section.title}>
-                {section.items.map(({ href, label, description, icon: Icon }) => (
-                  <CommandItem key={href} value={`${label} ${description}`} onSelect={() => go(href)}>
-                    <Icon aria-hidden="true" />
-                    <span>{label}</span>
-                    <span className="ml-2 truncate text-xs text-muted-foreground">{description}</span>
-                  </CommandItem>
-                ))}
+                {section.items.map(({ href, label, description, icon }) => {
+                  const Icon = NAV_ICONS[icon];
+                  return (
+                    <CommandItem key={href} value={`${label} ${description}`} onSelect={() => go(href)}>
+                      <Icon aria-hidden="true" />
+                      <span>{label}</span>
+                      <span className="ml-2 truncate text-xs text-muted-foreground">{description}</span>
+                    </CommandItem>
+                  );
+                })}
               </CommandGroup>
             ))}
           </CommandList>

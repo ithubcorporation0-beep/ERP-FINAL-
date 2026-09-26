@@ -42,7 +42,9 @@ src/
     action.ts            runAction(): server-action wrapper → ActionResult
     errors.ts            AppError family + toAppError() (maps Zod and database errors)
     logger.ts            Structured logger with secret redaction
-    auth/ db/ env/       Sessions & passwords · Prisma client · validated environment
+    auth/                Sessions, passwords, tokens, session policy, authorizePage(), public routes
+    email/               sendEmail() (smtp | console | memory transports) + templates
+    db/ env/             Prisma client · validated environment
     permissions/         Permission catalogue, default roles, hasPermission()
     settings/            Settings registry (keys, schemas, defaults)
     tenant/              requireTenant() / requirePermission() → TenantContext
@@ -52,6 +54,7 @@ src/
   types/                 Shared TypeScript types
   generated/prisma/      Prisma client — generated on `npm install`, not committed
   instrumentation.ts     Runs once at server start: validates environment variables
+  proxy.ts               Next.js proxy: sends signed-out visitors to /login (cookie check only)
 ```
 
 ## How a request flows
@@ -81,6 +84,14 @@ Several of those rules are enforced automatically by ESLint (no `any`, no `@ts-i
 
 ## Backend conventions
 
+### Authentication and authorization
+
+Full details in [`permissions.md`](permissions.md). In short: the proxy only redirects visitors without a
+session cookie; the `(dashboard)` layout validates the session in the database; **every page** calls
+`authorizePage(permission)`, **every action and API route** calls `requirePermission(permission)`, and sensitive
+**services** call `authorize(ctx, permission)` again. Services never touch cookies — actions create/destroy sessions
+after a service succeeds, which keeps all account rules testable against the real database.
+
 ### TenantContext
 
 `requireTenant()` / `requirePermission(module, action)` (`src/lib/tenant`) run on the server for every
@@ -92,6 +103,7 @@ interface TenantContext {
   userId: string;
   companyId: string;
   roleId: string;
+  roleName: string;
   permissions: string[];
 }
 ```

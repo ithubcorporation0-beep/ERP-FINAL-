@@ -31,20 +31,20 @@ Ids are UUIDs (v7). The company is always taken from the signed-in user's member
 
 ## Auth
 
-| Method | Path               | Body                  |
-| ------ | ------------------ | --------------------- |
-| POST   | `/api/auth/login`  | `{ email, password }` |
-| POST   | `/api/auth/logout` | —                     |
-| GET    | `/api/auth/me`     | —                     |
+| Method | Path               | Body                                                                                               |
+| ------ | ------------------ | -------------------------------------------------------------------------------------------------- |
+| POST   | `/api/auth/login`  | `{ email, password }` → 200 user, or 401 (invalid credentials, locked account or unverified email) |
+| POST   | `/api/auth/logout` | —                                                                                                  |
+| GET    | `/api/auth/me`     | — → the caller's `TenantContext` (user, company, role, permissions)                                |
 
 ## Customers
 
 | Method | Path                                     | Permission         |
 | ------ | ---------------------------------------- | ------------------ |
-| GET    | `/api/customers?page=&pageSize=&search=` | `customers:read`   |
+| GET    | `/api/customers?page=&pageSize=&search=` | `customers:view`   |
 | POST   | `/api/customers`                         | `customers:create` |
-| GET    | `/api/customers/:id`                     | `customers:read`   |
-| PATCH  | `/api/customers/:id`                     | `customers:update` |
+| GET    | `/api/customers/:id`                     | `customers:view`   |
+| PATCH  | `/api/customers/:id`                     | `customers:edit`   |
 | DELETE | `/api/customers/:id` (soft delete)       | `customers:delete` |
 
 List responses: `{ items, total, page, pageSize }`. Records include `companyId`, `createdAt`, `updatedAt`, `createdById`, `updatedById`.

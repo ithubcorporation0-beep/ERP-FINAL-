@@ -30,6 +30,8 @@ export default defineConfig([
         { "ts-ignore": true, "ts-expect-error": true, "ts-nocheck": true },
       ], // rule 6
       "no-empty": ["error", { allowEmptyCatch: false }], // rule 5
+      // Parameters named `_x` are intentionally unused (e.g. required by a function signature).
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
   },
   {

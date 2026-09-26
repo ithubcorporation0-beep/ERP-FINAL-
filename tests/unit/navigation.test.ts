@@ -1,7 +1,13 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { NAV_ITEMS, allowedNavHrefs, findNavItem, visibleNavSections } from "@/config/navigation";
+import {
+  NAV_ITEMS,
+  allowedNavHrefs,
+  findNavItem,
+  landingPath,
+  visibleNavSections,
+} from "@/config/navigation";
 import { DEFAULT_ROLES, expandPermissions } from "@/lib/permissions";
 
 // Roles as stored in the database: wildcards expanded to concrete permission keys.
@@ -21,7 +27,7 @@ describe("navigation", () => {
   });
 
   it("shows everything to the Owner role", () => {
-    expect(allowedNavHrefs(rolePermissions("Owner"))).toHaveLength(NAV_ITEMS.length);
+    expect(allowedNavHrefs(rolePermissions("Super Admin"))).toHaveLength(NAV_ITEMS.length);
   });
 
   it("hides modules a role cannot read", () => {
@@ -30,7 +36,7 @@ describe("navigation", () => {
     expect(visibleNavSections(hrefs).map((section) => section.title)).toEqual([
       "Overview",
       "Operations",
-      "System",
+      "Personal",
     ]);
   });
 
@@ -38,5 +44,15 @@ describe("navigation", () => {
     expect(findNavItem("/crm")?.label).toBe("CRM");
     expect(findNavItem("/crm/customers/123")?.label).toBe("CRM");
     expect(findNavItem("/crm-other")).toBeUndefined();
+  });
+
+  it("lands each role on the first page it may open, or the profile page", () => {
+    expect(landingPath(rolePermissions("Super Admin"))).toBe("/dashboard");
+    expect(landingPath(rolePermissions("Customer"))).toBe("/profile");
+  });
+
+  it("shows administration pages only to roles that may view them", () => {
+    expect(allowedNavHrefs(rolePermissions("Admin"))).toEqual(expect.arrayContaining(["/users", "/roles"]));
+    expect(allowedNavHrefs(rolePermissions("Accountant"))).not.toContain("/users");
   });
 });

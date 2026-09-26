@@ -118,6 +118,7 @@ modules they may open. The sidebar, mobile menu, search and breadcrumbs all read
 | Form row (label/hint/error) | `FormField` (React Hook Form)                   | `components/forms/form-field.tsx`           |
 | Date input                  | `DatePicker`                                    | `components/forms/date-picker.tsx`          |
 | Select from a list          | `SelectInput`                                   | `components/forms/select-input.tsx`         |
+| Password field (show/hide)  | `PasswordInput`                                 | `components/forms/password-input.tsx`       |
 | Tabs                        | `Tabs`, `TabsList`, `TabsTrigger`, …            | `components/ui/tabs.tsx`                    |
 | Dropdown menu               | `DropdownMenu`, `DropdownMenuItem`, …           | `components/ui/dropdown-menu.tsx`           |
 | Toasts                      | `toast.success()` etc. from `sonner`            | `<Toaster />` is mounted in the root layout |
@@ -125,6 +126,7 @@ modules they may open. The sidebar, mobile menu, search and breadcrumbs all read
 | Success message             | `SuccessMessage`                                | `components/shared/success-message.tsx`     |
 | Skeletons                   | `PageSkeleton`, `TableSkeleton`, `CardSkeleton` | `components/shared/skeletons.tsx`           |
 | Unbuilt module page         | `ModulePlaceholder`                             | `components/shared/module-placeholder.tsx`  |
+| Page the role can't open    | `AccessDenied`                                  | `components/shared/access-denied.tsx`       |
 
 ### Rules of use
 

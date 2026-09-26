@@ -17,7 +17,7 @@ Isolation is enforced in repositories; Postgres row-level security can be added 
 
 Sessions are random tokens stored hashed (SHA-256) in the `Session` table and sent as HTTP-only cookies.
 They can be revoked instantly, unlike JWTs. Because tokens are random, no signing secret is needed —
-which is why there is no `AUTH_SECRET` variable.
+which is why there is no `AUTH_SECRET` variable. (Extended in ADR-019.)
 
 ## ADR-004: String-based permissions on roles — _superseded by ADR-014_
 
@@ -154,3 +154,44 @@ Services and constraints are tested against a real, migrated PostgreSQL database
 most multi-tenant bugs live in queries and constraints. The runner refuses any database whose name lacks
 "test" and empties tables before each test. The seed runs with `tsx --conditions=react-server` so it can
 reuse the real services (which import `server-only` modules) instead of duplicating their logic.
+
+## ADR-019: Own authentication instead of an auth provider (phase 03)
+
+The project already had its own database sessions (ADR-003), so phase 03 completes that instead of adding a
+provider (Auth.js, Clerk, …): tenant-aware sessions, invitations into companies and permission checks all live
+next to the data, with no extra service, cost or vendor lock-in. Security properties implemented explicitly:
+bcrypt (cost 12), 256-bit random session and link tokens stored hashed, idle (7 d) + absolute (30 d) session
+expiry, new token on every sign-in, account lockout (5 failures / 15 min), no account enumeration on sign-in,
+registration or password reset, single-use and expiring email links that require a button press, sign-out
+everywhere after a password reset, safe same-site `next` redirects, and audit entries for every account event.
+If SSO (SAML/OIDC) is needed later, it can be added as another way to create a session.
+
+## ADR-020: Permission constants and vocabulary (phase 03)
+
+Permissions are an explicit list of `module:action` keys (`PERMISSION_KEYS`) rather than a generated
+module × action cross product: only meaningful combinations exist (e.g. `approve`/`reject` only where there are
+requests to approve; `manage` only for users, roles and settings) and TypeScript rejects typos. Verbs follow the
+product vocabulary: `view`, `create`, `edit`, `delete`, `export`, `approve`, `reject`, `manage`. The migration
+renamed `read→view` and `update→edit` in place, so existing grants survived.
+
+## ADR-021: Authorization enforced in layers (phase 03)
+
+Proxy (cookie present?) → layout (valid session, company access) → page `authorizePage()` → action/route
+`requirePermission()` → service `authorize()`. The proxy is optimistic by design (Next.js recommends it for fast
+redirects only). Next's `forbidden()` requires an experimental flag, so pages render `<AccessDenied />` instead.
+Privilege escalation is prevented with one rule — you can only grant or assign permissions you hold — which
+also covers "Admins can't create Super Admins" without special cases.
+
+## ADR-022: Email delivery (phase 03)
+
+`sendEmail()` with three transports chosen by `EMAIL_TRANSPORT`: `smtp` (nodemailer; required in production and
+validated at startup), `console` (development/CI: the email, including its link, is printed to the log) and
+`memory` (tests only: integration tests and the e2e fixture read the link from the captured email, so flows are
+tested end to end without a mail server). A failed email is logged and reported to the user (e.g. "use Resend
+invitation") instead of silently failing or rolling back the saved change.
+
+## ADR-023: Navigation config is plain data (phase 03)
+
+`src/config/navigation.ts` holds icon _names_; `src/components/layout/nav-icons.ts` maps them to icon components.
+Server code (post-login landing page, permission-filtered menus) can import the config without pulling a UI
+library into server-only scripts such as the seed and e2e fixtures.

@@ -17,6 +17,11 @@ export const companyRepository = {
     return client.company.findFirst({ where: { id, deletedAt: null }, select: summary });
   },
 
+  /** Ids of all active companies (used by the seed to refresh built-in roles everywhere). */
+  listIds(client: DbClient = db) {
+    return client.company.findMany({ where: { deletedAt: null }, select: { id: true } });
+  },
+
   findBySlug(slug: string, client: DbClient = db) {
     return client.company.findUnique({ where: { slug }, select: summary });
   },

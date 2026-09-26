@@ -15,7 +15,7 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 | 00  | `chore(phase-00): initialize ERP project foundation`              | ✅     |
 | 01  | `feat(phase-01): establish ERP UI and UX design system`           | ✅     |
 | 02  | `feat(phase-02): establish database and backend foundation`       | ✅     |
-| 03  | `feat(phase-03): implement authentication and RBAC`               | 🟡     |
+| 03  | `feat(phase-03): implement authentication and RBAC`               | ✅     |
 | 04  | `feat(phase-04): implement multi-tenant company foundation`       | 🟡     |
 | 05  | `feat(phase-05): implement dashboard`                             | ⬜     |
 | 06  | `feat(phase-06): implement CRM`                                   | 🟡     |
@@ -75,11 +75,16 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 
 ## Phase 03 — Authentication and RBAC
 
-- ✅ Database sessions, bcrypt passwords, login/logout (`auth.service`)
-- ✅ Permission model with wildcards, `requirePermission`, default roles
-- ⬜ Route protection middleware, password reset, session revocation UI
-- ⬜ Login rate limiting
-- ✅ Audit login/logout (done in phase 02: `audit_logs.company_id` is nullable for account events)
+- ✅ Login, logout, registration (optional), forgot/reset password, email verification, change password
+- ✅ Invitations with single-use links; profile page; signed-in devices with remote sign-out
+- ✅ Sessions: idle + absolute expiry, new token per sign-in, lockout after 5 failures, audited account events
+- ✅ Email delivery (SMTP / console / memory transports) with templates
+- ✅ Roles: Super Admin, Admin, Manager, Accountant, HR Manager, Employee, Customer
+- ✅ Permissions: view, create, edit, delete, export, approve, reject, manage settings/users/roles (101 keys)
+- ✅ Protection in layers: proxy, layout, `authorizePage`, `requirePermission`, service `authorize`
+- ✅ User management UI (invite, change role, suspend/reactivate, remove, resend) and role management UI
+  (permission matrix, custom roles, duplicate, delete) with privilege-escalation guard
+- ✅ Tests: integration (auth + RBAC), e2e (protected pages, forbidden actions, role permissions)
 
 ## Phase 04 — Multi-tenant company foundation
 

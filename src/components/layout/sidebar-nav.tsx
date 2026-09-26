@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { findNavItem, visibleNavSections } from "@/config/navigation";
 import { cn } from "@/lib/utils";
+import { NAV_ICONS } from "./nav-icons";
 
 interface SidebarNavProps {
   allowedHrefs: readonly string[];
@@ -22,7 +23,8 @@ export function SidebarNav({ allowedHrefs, onNavigate }: SidebarNavProps) {
           <p className="px-2.5 pb-1 text-[0.6875rem] font-medium tracking-wider text-muted-foreground uppercase">
             {section.title}
           </p>
-          {section.items.map(({ href, label, icon: Icon }) => {
+          {section.items.map(({ href, label, icon }) => {
+            const Icon = NAV_ICONS[icon];
             const active = href === activeHref;
             return (
               <Link

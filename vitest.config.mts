@@ -46,7 +46,14 @@ export default defineConfig({
                 name: "integration",
                 environment: "node",
                 include: ["tests/integration/**/*.test.ts"],
-                env: { DATABASE_URL: testDatabaseUrl, NODE_ENV: "test" },
+                env: {
+                  DATABASE_URL: testDatabaseUrl,
+                  NODE_ENV: "test",
+                  // Emails are captured in memory so tests can follow the links they contain.
+                  EMAIL_TRANSPORT: "memory",
+                  AUTH_ALLOW_REGISTRATION: "true",
+                  APP_URL: "http://localhost:3000",
+                },
                 globalSetup: ["tests/setup/integration-global.ts"],
                 setupFiles: ["tests/setup/integration.ts"],
                 // One shared database: run files one at a time.

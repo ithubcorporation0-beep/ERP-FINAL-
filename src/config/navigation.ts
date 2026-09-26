@@ -1,28 +1,33 @@
-import {
-  Bell,
-  BriefcaseBusiness,
-  ChartColumn,
-  FolderKanban,
-  LayoutDashboard,
-  Package,
-  ReceiptText,
-  ScrollText,
-  Settings,
-  Users,
-  Wallet,
-  WalletCards,
-  type LucideIcon,
-} from "lucide-react";
-import { hasPermission, type Module } from "@/lib/permissions";
+import { hasPermission, type PermissionKey } from "@/lib/permissions";
+
+export type NavIconName =
+  | "dashboard"
+  | "customers"
+  | "sales"
+  | "finance"
+  | "hr"
+  | "payroll"
+  | "projects"
+  | "inventory"
+  | "reports"
+  | "users"
+  | "roles"
+  | "audit"
+  | "settings"
+  | "notifications";
 
 export interface NavItem {
   label: string;
   href: string;
-  icon: LucideIcon;
+  /** Icon name; mapped to an icon component in src/components/layout/nav-icons.ts (keeps this file UI-free). */
+  icon: NavIconName;
   /** One-line summary, shown on the module's page and in global search. */
   description: string;
-  /** Module whose `read` permission is required to see the link. Omit for items everyone sees. */
-  module?: Module;
+  /**
+   * Permission needed to open the page. The page itself enforces it on the server; the menu only hides
+   * links the user can't open. Omit for pages every signed-in user may see.
+   */
+  permission?: PermissionKey;
 }
 
 export interface NavSection {
@@ -30,7 +35,10 @@ export interface NavSection {
   items: NavItem[];
 }
 
-/** Single source of truth for the sidebar, mobile menu, breadcrumbs and global search. */
+/**
+ * Single source of truth for the sidebar, mobile menu, breadcrumbs, global search and post-login landing.
+ * Plain data (no React imports) so server code can use it too.
+ */
 export const NAV_SECTIONS: NavSection[] = [
   {
     title: "Overview",
@@ -38,7 +46,8 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         label: "Dashboard",
         href: "/dashboard",
-        icon: LayoutDashboard,
+        icon: "dashboard",
+        permission: "dashboard:view",
         description: "Key figures and activity across your company.",
       },
     ],
@@ -49,15 +58,15 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         label: "CRM",
         href: "/crm",
-        icon: Users,
-        module: "customers",
+        icon: "customers",
+        permission: "customers:view",
         description: "Customers, contacts and the lead pipeline.",
       },
       {
         label: "Sales",
         href: "/sales",
-        icon: ReceiptText,
-        module: "invoices",
+        icon: "sales",
+        permission: "invoices:view",
         description: "Quotes, invoices and customer payments.",
       },
     ],
@@ -68,8 +77,8 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         label: "Finance",
         href: "/finance",
-        icon: Wallet,
-        module: "accounting",
+        icon: "finance",
+        permission: "accounting:view",
         description: "Chart of accounts, journal entries, expenses and statements.",
       },
     ],
@@ -80,15 +89,15 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         label: "HR",
         href: "/hr",
-        icon: BriefcaseBusiness,
-        module: "employees",
+        icon: "hr",
+        permission: "employees:view",
         description: "Employees, attendance and leave requests.",
       },
       {
         label: "Payroll",
         href: "/payroll",
-        icon: WalletCards,
-        module: "payroll",
+        icon: "payroll",
+        permission: "payroll:view",
         description: "Payroll runs and payslips.",
       },
     ],
@@ -99,15 +108,15 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         label: "Projects",
         href: "/projects",
-        icon: FolderKanban,
-        module: "projects",
+        icon: "projects",
+        permission: "projects:view",
         description: "Projects, tasks and assignments.",
       },
       {
         label: "Inventory",
         href: "/inventory",
-        icon: Package,
-        module: "inventory",
+        icon: "inventory",
+        permission: "inventory:view",
         description: "Products, stock levels, suppliers and purchase orders.",
       },
     ],
@@ -118,34 +127,53 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         label: "Reports",
         href: "/reports",
-        icon: ChartColumn,
-        module: "reports",
+        icon: "reports",
+        permission: "reports:view",
         description: "Financial, sales, HR and inventory reports with exports.",
       },
     ],
   },
   {
-    title: "System",
+    title: "Administration",
     items: [
       {
-        label: "Notifications",
-        href: "/notifications",
-        icon: Bell,
-        description: "Alerts and updates addressed to you.",
+        label: "Users",
+        href: "/users",
+        icon: "users",
+        permission: "users:view",
+        description: "Invite people, assign roles and control access.",
+      },
+      {
+        label: "Roles",
+        href: "/roles",
+        icon: "roles",
+        permission: "roles:view",
+        description: "Roles and the permissions each one grants.",
       },
       {
         label: "Audit Logs",
         href: "/audit-logs",
-        icon: ScrollText,
-        module: "audit-logs",
+        icon: "audit",
+        permission: "audit-logs:view",
         description: "A tamper-evident history of important changes.",
       },
       {
         label: "Settings",
         href: "/settings",
-        icon: Settings,
-        module: "settings",
-        description: "Company profile, users, roles and preferences.",
+        icon: "settings",
+        permission: "settings:view",
+        description: "Company profile and preferences.",
+      },
+    ],
+  },
+  {
+    title: "Personal",
+    items: [
+      {
+        label: "Notifications",
+        href: "/notifications",
+        icon: "notifications",
+        description: "Alerts and updates addressed to you.",
       },
     ],
   },
@@ -155,7 +183,7 @@ export const NAV_ITEMS: NavItem[] = NAV_SECTIONS.flatMap((section) => section.it
 
 /** The hrefs a user with these permissions may see. Computed on the server, passed to client UI. */
 export function allowedNavHrefs(permissions: readonly string[]): string[] {
-  return NAV_ITEMS.filter((item) => !item.module || hasPermission(permissions, `${item.module}:read`)).map(
+  return NAV_ITEMS.filter((item) => !item.permission || hasPermission(permissions, item.permission)).map(
     (item) => item.href,
   );
 }
@@ -182,4 +210,15 @@ export function getNavItem(href: string): NavItem {
   const item = NAV_ITEMS.find((candidate) => candidate.href === href);
   if (!item) throw new Error(`No navigation item for ${href}`);
   return item;
+}
+
+/** Where to send a user after sign-in: the first page they may open (the profile page always works). */
+export function landingPath(permissions: readonly string[]): string {
+  return allowedNavHrefs(permissions).find((href) => href !== "/notifications") ?? "/profile";
+}
+
+/** Only same-site paths are allowed as "next" targets after sign-in (prevents open redirects). */
+export function safeNextPath(next: string | null | undefined): string | null {
+  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return null;
+  return next;
 }

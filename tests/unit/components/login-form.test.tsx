@@ -24,7 +24,10 @@ describe("LoginForm", () => {
   });
 
   it("submits valid credentials and shows the server error", async () => {
-    vi.mocked(loginAction).mockResolvedValue({ error: "Invalid email or password." });
+    vi.mocked(loginAction).mockResolvedValue({
+      ok: false,
+      error: { code: "VALIDATION_FAILED", message: "Invalid email or password." },
+    });
     const user = userEvent.setup();
     render(<LoginForm />);
 
@@ -33,6 +36,9 @@ describe("LoginForm", () => {
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(await screen.findByText("Invalid email or password.")).toBeInTheDocument();
-    expect(loginAction).toHaveBeenCalledWith({ email: "admin@example.com", password: "wrong-password" });
+    expect(loginAction).toHaveBeenCalledWith(
+      { email: "admin@example.com", password: "wrong-password" },
+      null,
+    );
   });
 });

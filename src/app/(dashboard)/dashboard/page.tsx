@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
+import { AccessDenied } from "@/components/shared/access-denied";
 import { ModulePlaceholder } from "@/components/shared/module-placeholder";
+import { getNavItem } from "@/config/navigation";
+import { authorizePage } from "@/lib/auth/page";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
-export default function DashboardPage() {
-  return <ModulePlaceholder href="/dashboard" />;
+const HREF = "/dashboard";
+
+export default async function DashboardPage() {
+  // Server-side check: hiding the menu link is not protection.
+  if (!(await authorizePage(getNavItem(HREF).permission))) return <AccessDenied />;
+  return <ModulePlaceholder href={HREF} />;
 }

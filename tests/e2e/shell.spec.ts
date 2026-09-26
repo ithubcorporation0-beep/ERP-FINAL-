@@ -11,7 +11,7 @@ test.skip(
 async function signIn(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(email ?? "");
-  await page.getByLabel("Password").fill(password ?? "");
+  await page.getByLabel("Password", { exact: true }).fill(password ?? "");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
 }
@@ -48,7 +48,7 @@ test.describe("desktop", () => {
     await page.getByRole("menuitem", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/login$/);
     await page.goto("/dashboard");
-    await expect(page).toHaveURL(/\/login$/);
+    await expect(page).toHaveURL(/\/login\?next=%2Fdashboard$/);
   });
 });
 

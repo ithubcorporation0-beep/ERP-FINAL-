@@ -17,7 +17,7 @@ Read `docs/architecture.md` before starting work.
 10. Use services/repositories for business/data operations (`src/server/services`, `src/server/repositories`).
 11. Validate every external input with Zod (`src/lib/validation`).
 12. Enforce authentication server-side.
-13. Enforce permissions server-side (`requirePermission(module, action)`).
+13. Enforce permissions server-side: `requirePermission("module:action")` in actions/API routes, `authorizePage("module:action")` in pages, `authorize(ctx, …)` in sensitive services. Never rely on hiding UI.
 14. Enforce tenant/company isolation server-side — every query is scoped by `companyId` (`company_id`).
 15. Record important actions in audit logs (`writeAuditLog` from `@/server/services/audit.service`, in the same transaction as the change).
 16. Every module must have loading, empty, error and success states.
@@ -30,19 +30,20 @@ Read `docs/architecture.md` before starting work.
 
 ## Where things go
 
-| Concern                             | Location                                                                                                            |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Prisma queries                      | `src/server/repositories/*.repository.ts` — only place that calls `db.<model>` for business data                    |
-| Business rules, transactions, audit | `src/server/services/*.service.ts`                                                                                  |
-| Route handlers / server actions     | `src/app/api/**`, `src/server/actions/**` — parse → authorize → call service                                        |
-| Zod schemas                         | `src/lib/validation` (env vars: `src/lib/env/schema.ts`)                                                            |
-| Prisma types                        | `@/generated/prisma/client` (generated, never edit)                                                                 |
-| Errors / logging                    | Throw `AppError`s from `@/lib/errors`; wrap routes in `handle()`, actions in `runAction()`; log with `@/lib/logger` |
-| Company settings                    | Registry `src/lib/settings/registry.ts` + `settingsService`                                                         |
-| Database conventions                | `docs/database.md` (snake_case, UUID v7, `company_id`, audit columns, composite FKs)                                |
-| shadcn/ui primitives                | `src/components/ui` — add with `npx shadcn@latest add <name>`                                                       |
-| Shared UI                           | `src/components/**` — no data access (ESLint enforces this)                                                         |
-| Module UI                           | `src/features/<module>`                                                                                             |
+| Concern                             | Location                                                                                                                             |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Prisma queries                      | `src/server/repositories/*.repository.ts` — only place that calls `db.<model>` for business data                                     |
+| Business rules, transactions, audit | `src/server/services/*.service.ts`                                                                                                   |
+| Route handlers / server actions     | `src/app/api/**`, `src/server/actions/**` — parse → authorize → call service                                                         |
+| Zod schemas                         | `src/lib/validation` (env vars: `src/lib/env/schema.ts`)                                                                             |
+| Prisma types                        | `@/generated/prisma/client` (generated, never edit)                                                                                  |
+| Errors / logging                    | Throw `AppError`s from `@/lib/errors`; wrap routes in `handle()`, actions in `runAction()`; log with `@/lib/logger`                  |
+| Permissions / auth                  | Keys in `src/lib/permissions` (`PERMISSION_KEYS`); helpers in `src/lib/tenant` and `src/lib/auth/page.ts`; see `docs/permissions.md` |
+| Company settings                    | Registry `src/lib/settings/registry.ts` + `settingsService`                                                                          |
+| Database conventions                | `docs/database.md` (snake_case, UUID v7, `company_id`, audit columns, composite FKs)                                                 |
+| shadcn/ui primitives                | `src/components/ui` — add with `npx shadcn@latest add <name>`                                                                        |
+| Shared UI                           | `src/components/**` — no data access (ESLint enforces this)                                                                          |
+| Module UI                           | `src/features/<module>`                                                                                                              |
 
 Reference implementation: the `customers` module.
 

@@ -9,7 +9,8 @@ The **core platform** tables. ERP module tables (invoices, employees, stock, …
 phase that builds each module, so every table is designed with its real requirements.
 
 ```
-companies ──┬── memberships ── users ── sessions
+companies ──┬── memberships ── users ──┬── sessions
+            │                          └── auth_tokens (email links)
             ├── roles ── role_permissions ── permissions (global catalogue)
             ├── settings
             ├── audit_logs (append-only; company optional)
@@ -17,19 +18,20 @@ companies ──┬── memberships ── users ── sessions
             └── notifications
 ```
 
-| Table              | Tenant-owned                           | Purpose                                                                          |
-| ------------------ | -------------------------------------- | -------------------------------------------------------------------------------- |
-| `companies`        | — (is the tenant)                      | A customer company: name, slug, status, currency, time zone, locale, fiscal year |
-| `users`            | no (global)                            | A person's login. Linked to companies through `memberships`                      |
-| `sessions`         | no                                     | Signed-in browser sessions (hashed tokens only)                                  |
-| `permissions`      | no (global)                            | Catalogue of `module:action` keys, synced from code                              |
-| `roles`            | `company_id`                           | Named permission sets per company (Owner, Admin, … + custom later)               |
-| `role_permissions` | `company_id`                           | Which permissions a role has                                                     |
-| `memberships`      | `company_id`                           | A user's access to a company, with exactly one role there                        |
-| `settings`         | `company_id`                           | Validated per-company preferences (key → JSON value)                             |
-| `audit_logs`       | `company_id` (null for sign-in events) | Immutable history of important actions                                           |
-| `customers`        | `company_id`                           | Reference module for the repository → service → route pattern                    |
-| `notifications`    | `company_id`                           | In-app notifications (the header bell)                                           |
+| Table              | Tenant-owned                               | Purpose                                                                          |
+| ------------------ | ------------------------------------------ | -------------------------------------------------------------------------------- |
+| `companies`        | — (is the tenant)                          | A customer company: name, slug, status, currency, time zone, locale, fiscal year |
+| `users`            | no (global)                                | A person's login. Linked to companies through `memberships`                      |
+| `sessions`         | no                                         | Signed-in browser sessions (hashed tokens only; idle + absolute expiry)          |
+| `auth_tokens`      | no (optional `company_id` for invitations) | Single-use email links: verification, password reset, invitation (hashed)        |
+| `permissions`      | no (global)                                | Catalogue of `module:action` keys, synced from code                              |
+| `roles`            | `company_id`                               | Named permission sets per company (Owner, Admin, … + custom later)               |
+| `role_permissions` | `company_id`                               | Which permissions a role has                                                     |
+| `memberships`      | `company_id`                               | A user's access to a company, with exactly one role there                        |
+| `settings`         | `company_id`                               | Validated per-company preferences (key → JSON value)                             |
+| `audit_logs`       | `company_id` (null for sign-in events)     | Immutable history of important actions                                           |
+| `customers`        | `company_id`                               | Reference module for the repository → service → route pattern                    |
+| `notifications`    | `company_id`                               | In-app notifications (the header bell)                                           |
 
 ## Conventions
 
@@ -120,6 +122,7 @@ Integration tests (`tests/integration`) run against **PostgreSQL, not mocks**:
 
 ## Migrations
 
-| Migration             | Contents                                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------------------- |
-| `20260925184444_init` | Core platform schema (phase 02). Replaced the phase-00 draft before any deployment — see ADR-015. |
+| Migration                      | Contents                                                                                                                                                                                                                                                                                                          |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `20260925184444_init`          | Core platform schema (phase 02). Replaced the phase-00 draft before any deployment — see ADR-015.                                                                                                                                                                                                                 |
+| `20260926172858_auth_and_rbac` | Phase 03: `auth_tokens`, user security columns (verification, lockout, profile), session absolute expiry. **Data migration:** permission verbs `read→view`, `update→edit`; role `Owner→Super Admin`; retired `Sales Rep` kept as a custom role; existing users marked verified. Run `npm run db:seed` afterwards. |

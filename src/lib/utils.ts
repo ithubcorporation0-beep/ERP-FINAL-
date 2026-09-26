@@ -21,3 +21,13 @@ export function initials(name: string): string {
   const letters = last ? `${first.charAt(0)}${last.charAt(0)}` : first.slice(0, 2);
   return letters.toUpperCase() || "?";
 }
+
+/** "IT Hub Ltd." → "it-hub-ltd". URL-safe identifier for companies. */
+export function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}

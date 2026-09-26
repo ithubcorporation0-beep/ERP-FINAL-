@@ -30,6 +30,8 @@ jobs:
       TEST_DATABASE_URL: postgresql://erp:erp@localhost:5432/it_hub_erp_test?schema=public
       APP_URL: http://localhost:3000
       NEXT_TELEMETRY_DISABLED: 1
+      # CI has no mail server: emails (with their links) are printed to the log.
+      EMAIL_TRANSPORT: console
       # CI-only throwaway credentials for the seeded admin used by the e2e tests.
       SEED_ADMIN_EMAIL: e2e-admin@example.com
       SEED_ADMIN_PASSWORD: ci-only-password-123

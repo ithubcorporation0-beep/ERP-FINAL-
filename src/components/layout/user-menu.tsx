@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Monitor, Moon, Settings, Sun } from "lucide-react";
+import { LogOut, Monitor, Moon, Sun, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -51,9 +51,9 @@ export function UserMenu({ user, companyName }: UserMenuProps) {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link href="/settings">
-              <Settings aria-hidden="true" />
-              Settings
+            <Link href="/profile">
+              <UserRound aria-hidden="true" />
+              Your profile
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSub>

@@ -15,19 +15,19 @@ async function customerId(params: Params["params"]): Promise<string> {
 }
 
 export const GET = handle(async (_req: Request, { params }: Params) => {
-  const ctx = await requirePermission("customers", "read");
+  const ctx = await requirePermission("customers:view");
   return NextResponse.json(await customerService.get(ctx, await customerId(params)));
 });
 
 export const PATCH = handle(async (req: Request, { params }: Params) => {
-  const ctx = await requirePermission("customers", "update");
+  const ctx = await requirePermission("customers:edit");
   const id = await customerId(params);
   const input = customerSchema.partial().parse(await req.json());
   return NextResponse.json(await customerService.update(ctx, id, input));
 });
 
 export const DELETE = handle(async (_req: Request, { params }: Params) => {
-  const ctx = await requirePermission("customers", "delete");
+  const ctx = await requirePermission("customers:delete");
   await customerService.remove(ctx, await customerId(params));
   return new NextResponse(null, { status: 204 });
 });

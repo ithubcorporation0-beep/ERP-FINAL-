@@ -1,12 +1,15 @@
 /**
  * Seed = system data only, never fake business data:
- *   1. syncs the permission catalogue,
- *   2. creates (or updates) the first company, its built-in roles and its Owner account.
+ *   1. syncs the permission catalogue (adds new keys, removes retired ones),
+ *   2. creates (or updates) the first company, its built-in roles and its Super Admin account,
+ *   3. refreshes the built-in roles of every company, so permission changes reach existing companies.
  * Idempotent — safe to run on every deploy. Run with `npm run db:seed`.
  */
 import "dotenv/config";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { slugify } from "@/lib/utils";
+import { accessService } from "@/server/services/access.service";
 import { companyService } from "@/server/services/company.service";
 
 const seedEnv = z.object({
@@ -15,14 +18,6 @@ const seedEnv = z.object({
   SEED_ADMIN_EMAIL: z.email("SEED_ADMIN_EMAIL must be an email address"),
   SEED_ADMIN_PASSWORD: z.string().min(12, "SEED_ADMIN_PASSWORD must be at least 12 characters"),
 });
-
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
 
 async function main() {
   const parsed = seedEnv.safeParse(process.env);
@@ -37,8 +32,11 @@ async function main() {
     owner: { email: env.SEED_ADMIN_EMAIL, name: env.SEED_ADMIN_NAME, password: env.SEED_ADMIN_PASSWORD },
   });
 
+  const companies = await accessService.syncAllCompanies();
+
   console.log(
-    `Seed complete — company "${result.company.name}" (${result.createdCompany ? "created" : "already existed"}), ` +
+    `Seed complete — built-in roles refreshed in ${companies} compan${companies === 1 ? "y" : "ies"}; ` +
+      `company "${result.company.name}" (${result.createdCompany ? "created" : "already existed"}), ` +
       `owner ${env.SEED_ADMIN_EMAIL.toLowerCase()} (${result.createdOwner ? "created" : "already existed"}).`,
   );
 }

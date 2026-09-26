@@ -4,6 +4,6 @@ import { requirePermission } from "@/lib/tenant";
 
 // TODO: implement following the customers module (repository → service → route).
 export const GET = handle(async () => {
-  await requirePermission("accounting", "read");
+  await requirePermission("accounting:view");
   return NextResponse.json({ error: "Not implemented" }, { status: 501 });
 });
