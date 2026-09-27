@@ -4,6 +4,9 @@ export type NavIconName =
   | "dashboard"
   | "customers"
   | "leads"
+  | "quotations"
+  | "orders"
+  | "payments"
   | "sales"
   | "finance"
   | "hr"
@@ -71,11 +74,32 @@ export const NAV_SECTIONS: NavSection[] = [
         description: "Potential customers and the sales pipeline.",
       },
       {
-        label: "Sales",
-        href: "/sales",
+        label: "Quotations",
+        href: "/sales/quotations",
+        icon: "quotations",
+        permission: "quotations:view",
+        description: "Price offers for customers, sent by email or WhatsApp.",
+      },
+      {
+        label: "Sales orders",
+        href: "/sales/orders",
+        icon: "orders",
+        permission: "quotations:view",
+        description: "Quotations the customer has confirmed, ready to invoice.",
+      },
+      {
+        label: "Invoices",
+        href: "/sales/invoices",
         icon: "sales",
         permission: "invoices:view",
-        description: "Quotes, invoices and customer payments.",
+        description: "Customer invoices, balances and due dates.",
+      },
+      {
+        label: "Payments",
+        href: "/sales/payments",
+        icon: "payments",
+        permission: "payments:view",
+        description: "Money received against invoices.",
       },
     ],
   },

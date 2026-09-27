@@ -18,18 +18,25 @@ import { CommunicationPanel } from "@/features/crm/communication-panel";
 import { DeleteRecordButton } from "@/features/crm/delete-record-button";
 import { DetailList } from "@/features/crm/detail-list";
 import { DocumentPanel } from "@/features/crm/document-panel";
-import { countryName, formatBytes, formatDate, formatDateTime } from "@/features/crm/format";
+import { countryName, formatBytes, formatDate, formatDateTime } from "@/lib/format";
 import { HistoryList } from "@/features/crm/history-list";
 import { CUSTOMER_STATUS_TONES, LEAD_STATUS_TONES } from "@/features/crm/labels";
 import { RelatedUnavailable } from "@/features/crm/related-unavailable";
+import { invoiceRow, paymentRow, quotationRow } from "@/features/sales/rows";
+import { SalesRowsTable } from "@/features/sales/sales-rows-table";
 import { authorizePage } from "@/lib/auth/page";
 import { orNotFound, recordIdOrNotFound } from "@/lib/page-data";
 import { can } from "@/lib/tenant";
+import { quotationListQuerySchema } from "@/lib/validation";
 import { deleteCustomerAction } from "@/server/actions/customer.actions";
 import { companyService } from "@/server/services/company.service";
 import { customerCommunicationService } from "@/server/services/customer-communication.service";
 import { customerDocumentService } from "@/server/services/customer-document.service";
 import { customerService } from "@/server/services/customer.service";
+import { invoiceService } from "@/server/services/invoice.service";
+import { paymentService } from "@/server/services/payment.service";
+import { quotationService } from "@/server/services/quotation.service";
+import { salesContext } from "@/server/services/sales-shared";
 
 export const metadata: Metadata = { title: "Customer" };
 
@@ -43,13 +50,25 @@ export default async function CustomerPage({ params }: PageProps<"/crm/customers
   if (!ctx) return <AccessDenied />;
   const id = recordIdOrNotFound((await params).id);
   const customer = await orNotFound(customerService.get(ctx, id));
-  const [format, communications, documents, history, leads] = await Promise.all([
-    companyService.formatting(ctx),
-    customerCommunicationService.list(ctx, id),
-    customerDocumentService.list(ctx, id),
-    customerService.history(ctx, id),
-    customerService.convertedLeads(ctx, id),
-  ]);
+  const sees = {
+    quotations: can(ctx, "quotations:view"),
+    invoices: can(ctx, "invoices:view"),
+    payments: can(ctx, "payments:view"),
+  };
+  const [format, communications, documents, history, leads, quotations, invoices, payments, sales] =
+    await Promise.all([
+      companyService.formatting(ctx),
+      customerCommunicationService.list(ctx, id),
+      customerDocumentService.list(ctx, id),
+      customerService.history(ctx, id),
+      customerService.convertedLeads(ctx, id),
+      sees.quotations
+        ? quotationService.list(ctx, quotationListQuerySchema.parse({ customerId: id, pageSize: 100 }))
+        : null,
+      sees.invoices ? invoiceService.listForCustomer(ctx, id) : null,
+      sees.payments ? paymentService.listForCustomer(ctx, id) : null,
+      salesContext(ctx),
+    ]);
   const canEdit = can(ctx, "customers:edit");
   const code = formatRecordNumber("customer", customer.number);
 
@@ -92,8 +111,11 @@ export default async function CustomerPage({ params }: PageProps<"/crm/customers
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="communication">Communication ({communications.total})</TabsTrigger>
             <TabsTrigger value="documents">Documents ({documents.length})</TabsTrigger>
-            <TabsTrigger value="invoices">Invoices</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
+            {quotations ? (
+              <TabsTrigger value="quotations">Quotations ({quotations.total})</TabsTrigger>
+            ) : null}
+            {invoices ? <TabsTrigger value="invoices">Invoices ({invoices.length})</TabsTrigger> : null}
+            {payments ? <TabsTrigger value="payments">Payments ({payments.length})</TabsTrigger> : null}
             <TabsTrigger value="projects">Projects</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
@@ -234,11 +256,42 @@ export default async function CustomerPage({ params }: PageProps<"/crm/customers
           />
         </TabsContent>
 
+        <TabsContent value="quotations">
+          {quotations ? (
+            <SalesRowsTable
+              caption={`Quotations of ${customer.name}`}
+              rows={quotations.items.map((quotation) => quotationRow(quotation, sales))}
+              empty="No quotations yet"
+              create={
+                can(ctx, "quotations:create")
+                  ? { href: `/sales/quotations/new?customerId=${id}`, label: "New quotation" }
+                  : undefined
+              }
+            />
+          ) : null}
+        </TabsContent>
         <TabsContent value="invoices">
-          <RelatedUnavailable records="invoices" module="sales" />
+          {invoices ? (
+            <SalesRowsTable
+              caption={`Invoices of ${customer.name}`}
+              rows={invoices.map((invoice) => invoiceRow(invoice, sales))}
+              empty="No invoices yet"
+              create={
+                can(ctx, "invoices:create")
+                  ? { href: `/sales/invoices/new?customerId=${id}`, label: "New invoice" }
+                  : undefined
+              }
+            />
+          ) : null}
         </TabsContent>
         <TabsContent value="payments">
-          <RelatedUnavailable records="payments" module="sales" />
+          {payments ? (
+            <SalesRowsTable
+              caption={`Payments of ${customer.name}`}
+              rows={payments.map((payment) => paymentRow(payment, sales))}
+              empty="No payments yet"
+            />
+          ) : null}
         </TabsContent>
         <TabsContent value="projects">
           <RelatedUnavailable records="projects" module="projects" />

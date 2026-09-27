@@ -16,7 +16,7 @@ describe("dashboard KPI grid", () => {
           {
             id: "totalCustomers",
             label: "Total customers",
-            state: { status: "ready", data: { value: 1234, format: "number", addedInRange: 5 } },
+            state: { status: "ready", data: { value: "1234", format: "number", addedInRange: 5 } },
           },
           {
             id: "totalRevenue",

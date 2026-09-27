@@ -166,3 +166,28 @@ export function resolveDateRange(preset: DateRangePreset, options: RangeOptions)
     months,
   };
 }
+
+/** Today's calendar date ("YYYY-MM-DD") in `timeZone`. */
+export function todayInZone(timeZone: string, now = new Date()): string {
+  const { year, month, day } = zonedParts(now, timeZone);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/**
+ * Calendar dates (PostgreSQL DATE columns) have no time zone. Prisma represents them as midnight UTC, so these
+ * two helpers convert between that Date and the "YYYY-MM-DD" text people enter.
+ */
+export function dateOnlyToDate(value: string): Date {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+export function dateToDateOnly(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
+/** "YYYY-MM-DD" plus a number of days, as "YYYY-MM-DD". */
+export function addDays(value: string, days: number): string {
+  const date = dateOnlyToDate(value);
+  date.setUTCDate(date.getUTCDate() + days);
+  return dateToDateOnly(date);
+}

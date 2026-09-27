@@ -3,7 +3,7 @@
 PostgreSQL (15+, developed on 16) through **Prisma 7**. Schema: `prisma/schema.prisma`.
 Prisma settings (connection URL, migrations folder, seed command): `prisma.config.ts`.
 
-## What exists today (phases 02–06)
+## What exists today (phases 02–07)
 
 The **core platform** tables. ERP module tables (invoices, employees, stock, …) are added by the
 phase that builds each module, so every table is designed with its real requirements.
@@ -18,28 +18,35 @@ companies ──┬── memberships ── users ──┬── sessions
             │               ├── customer_communications (log + notes)
             │               └── leads (converted leads point at their customer)
             ├── leads (pipeline; assigned_to → users)
-            ├── number_sequences (per-company counters: CUS-0001, LEAD-0001, …)
+            ├── number_sequences (per-company counters: CUS-0001, LEAD-0001, QUO/SO/INV/PAY …)
+            ├── quotations ── quotation_items   (a confirmed quotation is a sales order)
+            ├── invoices ── invoice_items, payments
+            └── share_links (public, expiring links to one document's PDF)
             └── notifications
 ```
 
-| Table                     | Tenant-owned                               | Purpose                                                                                                                                                  |
-| ------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `companies`               | — (is the tenant)                          | A customer company: name, legal name, tax id, contact details, country, base currency, time zone, locale, fiscal year, status, logo (storage key + type) |
-| `users`                   | no (global)                                | A person's login. Linked to companies through `memberships`                                                                                              |
-| `sessions`                | no                                         | Signed-in browser sessions (hashed tokens only; idle + absolute expiry; `active_company_id` = company chosen in the switcher)                            |
-| `auth_tokens`             | no (optional `company_id` for invitations) | Single-use email links: verification, password reset, invitation (hashed)                                                                                |
-| `permissions`             | no (global)                                | Catalogue of `module:action` keys, synced from code                                                                                                      |
-| `roles`                   | `company_id`                               | Named permission sets per company (Owner, Admin, … + custom later)                                                                                       |
-| `role_permissions`        | `company_id`                               | Which permissions a role has                                                                                                                             |
-| `memberships`             | `company_id`                               | A user's access to a company, with exactly one role there                                                                                                |
-| `settings`                | `company_id`                               | Validated per-company preferences (key → JSON value)                                                                                                     |
-| `audit_logs`              | `company_id` (null for sign-in events)     | Immutable history of important actions                                                                                                                   |
-| `customers`               | `company_id`                               | CRM customers (reference module): `number` (Customer ID), contact details, WhatsApp, city, country, tax number, type, status, notes; soft delete         |
-| `customer_documents`      | `company_id`                               | Files attached to a customer: cleaned name, storage key, detected content type, size                                                                     |
-| `customer_communications` | `company_id`                               | Communication log and notes on a customer: channel, direction, subject, body, when                                                                       |
-| `leads`                   | `company_id`                               | Sales pipeline: `number` (Lead ID), contact, source, assignee (a member), stage, expected value (NUMERIC 18,2), follow-up date, converted customer       |
-| `number_sequences`        | `company_id`                               | Per-company counters for human-readable numbers, incremented atomically (`INSERT … ON CONFLICT … RETURNING`)                                             |
-| `notifications`           | `company_id`                               | In-app notifications (the header bell)                                                                                                                   |
+| Table                           | Tenant-owned                               | Purpose                                                                                                                                                          |
+| ------------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `companies`                     | — (is the tenant)                          | A customer company: name, legal name, tax id, contact details, country, base currency, time zone, locale, fiscal year, status, logo (storage key + type)         |
+| `users`                         | no (global)                                | A person's login. Linked to companies through `memberships`                                                                                                      |
+| `sessions`                      | no                                         | Signed-in browser sessions (hashed tokens only; idle + absolute expiry; `active_company_id` = company chosen in the switcher)                                    |
+| `auth_tokens`                   | no (optional `company_id` for invitations) | Single-use email links: verification, password reset, invitation (hashed)                                                                                        |
+| `permissions`                   | no (global)                                | Catalogue of `module:action` keys, synced from code                                                                                                              |
+| `roles`                         | `company_id`                               | Named permission sets per company (Owner, Admin, … + custom later)                                                                                               |
+| `role_permissions`              | `company_id`                               | Which permissions a role has                                                                                                                                     |
+| `memberships`                   | `company_id`                               | A user's access to a company, with exactly one role there                                                                                                        |
+| `settings`                      | `company_id`                               | Validated per-company preferences (key → JSON value)                                                                                                             |
+| `audit_logs`                    | `company_id` (null for sign-in events)     | Immutable history of important actions                                                                                                                           |
+| `customers`                     | `company_id`                               | CRM customers (reference module): `number` (Customer ID), contact details, WhatsApp, city, country, tax number, type, status, notes; soft delete                 |
+| `customer_documents`            | `company_id`                               | Files attached to a customer: cleaned name, storage key, detected content type, size                                                                             |
+| `customer_communications`       | `company_id`                               | Communication log and notes on a customer: channel, direction, subject, body, when                                                                               |
+| `leads`                         | `company_id`                               | Sales pipeline: `number` (Lead ID), contact, source, assignee (a member), stage, expected value (NUMERIC 18,2), follow-up date, converted customer               |
+| `quotations`, `quotation_items` | `company_id`                               | Quotations / sales orders (`number`, `order_number`), customer, lead, dates, currency, exact totals; lines with quantity, unit price, discount %, tax %, amounts |
+| `invoices`, `invoice_items`     | `company_id`                               | Invoices (`code` as issued), customer, source quotation, dates, status, totals, `amount_paid` (kept equal to the sum of non-voided payments)                     |
+| `payments`                      | `company_id`                               | Money received against an invoice; voided (`voided_at`, reason, by) instead of deleted                                                                           |
+| `share_links`                   | `company_id`                               | Token hash, document type + id, expiry, revocation, last access                                                                                                  |
+| `number_sequences`              | `company_id`                               | Per-company counters for human-readable numbers, incremented atomically (`INSERT … ON CONFLICT … RETURNING`)                                                     |
+| `notifications`                 | `company_id`                               | In-app notifications (the header bell)                                                                                                                           |
 
 ## Conventions
 
@@ -59,8 +66,8 @@ companies ──┬── memberships ── users ──┬── sessions
 Company data is protected at several levels (overview in `docs/architecture.md` → Multi-tenancy):
 
 1. **Schema:** `company_id` on every company-owned table (`roles`, `role_permissions`, `memberships`, `settings`,
-   `customers`, `customer_documents`, `customer_communications`, `leads`, `number_sequences`, `notifications`,
-   `audit_logs`), with composite foreign keys for children (a document, note or converted lead can only point at a
+   `customers`, `customer_documents`, `customer_communications`, `leads`, `number_sequences`, `quotations`,
+   `quotation_items`, `invoices`, `invoice_items`, `payments`, `share_links`, `notifications`, `audit_logs`), with composite foreign keys for children (a document, note or converted lead can only point at a
    customer of the same company — the database refuses anything else).
 2. **Repositories:** every function takes `companyId` first and filters by it, including `updateMany` / `deleteMany`
    (a guessed id of another company updates or deletes **0 rows**).
@@ -73,7 +80,8 @@ Company data is protected at several levels (overview in `docs/architecture.md` 
 Not covered by the guard (review these by hand): raw SQL (`$queryRaw`, `$executeRaw`) and nested relation queries
 (they are reached through an already-scoped parent). Raw SQL is used only where Prisma can't express the query
 (today: `customerRepository.countCreatedByMonth`, grouping by month in the company's time zone, and
-`numberSequenceRepository.next`, an atomic upsert-and-increment); it always filters
+`numberSequenceRepository.next`, an atomic upsert-and-increment; `invoiceRepository.lock` (`SELECT … FOR UPDATE`) and
+`sumIssuedByMonth`); it always filters
 `company_id = ${companyId}` explicitly, uses tagged-template parameters (never string concatenation), validates the
 rows with Zod, and has an isolation test. PostgreSQL row-level security can be added later as a sixth
 layer (see ADR-024).
@@ -160,9 +168,11 @@ Integration tests (`tests/integration`) run against **PostgreSQL, not mocks**:
 
 ## Migrations
 
-| Migration                                 | Contents                                                                                                                                                                                                                                                                                                          |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `20260925184444_init`                     | Core platform schema (phase 02). Replaced the phase-00 draft before any deployment — see ADR-015.                                                                                                                                                                                                                 |
-| `20260926172858_auth_and_rbac`            | Phase 03: `auth_tokens`, user security columns (verification, lockout, profile), session absolute expiry. **Data migration:** permission verbs `read→view`, `update→edit`; role `Owner→Super Admin`; retired `Sales Rep` kept as a custom role; existing users marked verified. Run `npm run db:seed` afterwards. |
-| `20260926181244_company_context_and_logo` | Phase 04: `sessions.active_company_id` (company switcher, `SET NULL` if the company is deleted); `companies.logo_key`, `logo_content_type`, `logo_updated_at`.                                                                                                                                                    |
-| `20260927120000_crm_customers_and_leads`  | Phase 06: CRM enums; new customer columns; `customer_documents`, `customer_communications`, `leads`, `number_sequences`. **Data migration:** existing customers are numbered 1, 2, 3… per company (oldest first) and each company's `customer` sequence continues after them.                                     |
+| Migration                                    | Contents                                                                                                                                                                                                                                                                                                          |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `20260925184444_init`                        | Core platform schema (phase 02). Replaced the phase-00 draft before any deployment — see ADR-015.                                                                                                                                                                                                                 |
+| `20260926172858_auth_and_rbac`               | Phase 03: `auth_tokens`, user security columns (verification, lockout, profile), session absolute expiry. **Data migration:** permission verbs `read→view`, `update→edit`; role `Owner→Super Admin`; retired `Sales Rep` kept as a custom role; existing users marked verified. Run `npm run db:seed` afterwards. |
+| `20260926181244_company_context_and_logo`    | Phase 04: `sessions.active_company_id` (company switcher, `SET NULL` if the company is deleted); `companies.logo_key`, `logo_content_type`, `logo_updated_at`.                                                                                                                                                    |
+| `20260927120000_crm_customers_and_leads`     | Phase 06: CRM enums; new customer columns; `customer_documents`, `customer_communications`, `leads`, `number_sequences`. **Data migration:** existing customers are numbered 1, 2, 3… per company (oldest first) and each company's `customer` sequence continues after them.                                     |
+| `20260927160000_sales_invoices_and_payments` | Phase 07: quotations (+ items), invoices (+ items), payments, share links; `leads (id, company_id)` unique for composite keys.                                                                                                                                                                                    |
+| `20260927160100_sales_money_checks`          | Phase 07: CHECK constraints — payment amount > 0, 0 ≤ amount paid ≤ total, totals ≥ 0, due/expiry ≥ document date, line quantity > 0, percentages 0–100.                                                                                                                                                          |

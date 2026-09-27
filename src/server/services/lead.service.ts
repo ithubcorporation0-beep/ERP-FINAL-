@@ -1,4 +1,5 @@
 import { formatRecordNumber, LEAD_STATUS_LABELS, LEAD_STATUSES, type LeadStatusKey } from "@/config/crm";
+import { dateOnlyToDate } from "@/lib/date-range";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { authorize, type TenantContext } from "@/lib/tenant";
@@ -18,10 +19,10 @@ function blankToNull(value: string | undefined): string | null | undefined {
   return value === undefined ? undefined : value === "" ? null : value;
 }
 
-/** "YYYY-MM-DD" → the Date Prisma stores in a DATE column (midnight UTC); "" → null. */
+/** "YYYY-MM-DD" → the Date Prisma stores in a DATE column; "" → null. */
 function toDateOnly(value: string | undefined): Date | null | undefined {
   if (value === undefined) return undefined;
-  return value === "" ? null : new Date(`${value}T00:00:00.000Z`);
+  return value === "" ? null : dateOnlyToDate(value);
 }
 
 function toLeadData(input: Partial<LeadInput>): Partial<LeadData> {

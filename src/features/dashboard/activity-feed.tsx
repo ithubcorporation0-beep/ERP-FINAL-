@@ -59,7 +59,10 @@ export function ActivityFeed({ items, tracked, unavailable, failed, locale, time
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{item.title}</p>
-                    <p className="text-xs text-muted-foreground">{SOURCE_LABELS[item.source]}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {SOURCE_LABELS[item.source]}
+                      {item.detail ? <span data-numeric> · {item.detail}</span> : null}
+                    </p>
                   </div>
                   <time dateTime={item.at} className="shrink-0 text-xs text-muted-foreground">
                     {dateTime.format(new Date(item.at))}

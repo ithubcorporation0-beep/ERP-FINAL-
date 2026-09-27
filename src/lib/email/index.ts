@@ -3,11 +3,21 @@ import nodemailer, { type Transporter } from "nodemailer";
 import { getServerEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
+export interface EmailAttachment {
+  filename: string;
+  content: Uint8Array;
+  contentType: string;
+}
+
 export interface EmailMessage {
   to: string;
   subject: string;
   text: string;
   html: string;
+  /** Files sent with the message (e.g. an invoice PDF). */
+  attachments?: EmailAttachment[];
+  /** Where replies go (e.g. the company's own email address). */
+  replyTo?: string;
 }
 
 /** Emails captured by the "memory" transport (automated tests only). */
@@ -42,10 +52,21 @@ export async function sendEmail(message: EmailMessage): Promise<void> {
         to: message.to,
         subject: message.subject,
         body: message.text,
+        attachments: message.attachments?.map(
+          (file) => `${file.filename} (${file.content.byteLength} bytes)`,
+        ),
       });
       return;
     case "smtp":
-      await smtpTransport().sendMail({ from: env.EMAIL_FROM, ...message });
+      await smtpTransport().sendMail({
+        from: env.EMAIL_FROM,
+        ...message,
+        attachments: message.attachments?.map((file) => ({
+          filename: file.filename,
+          content: Buffer.from(file.content),
+          contentType: file.contentType,
+        })),
+      });
       return;
   }
 }

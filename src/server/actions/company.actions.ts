@@ -26,6 +26,9 @@ export async function updatePreferencesAction(input: unknown): Promise<ActionRes
     await settingsService.set(ctx, "general.dateFormat", values.dateFormat);
     await settingsService.set(ctx, "general.weekStartsOn", values.weekStartsOn);
     await settingsService.set(ctx, "documents.invoiceNumberPrefix", values.invoiceNumberPrefix);
+    await settingsService.set(ctx, "sales.paymentTermsDays", values.paymentTermsDays);
+    await settingsService.set(ctx, "sales.quotationValidityDays", values.quotationValidityDays);
+    await settingsService.set(ctx, "sales.documentTerms", values.documentTerms);
     revalidatePath("/settings");
   });
 }

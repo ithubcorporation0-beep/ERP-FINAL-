@@ -14,6 +14,9 @@ const schemas = {
     .min(1)
     .max(10)
     .regex(/^[A-Z0-9-]+$/, "Use capital letters, digits and dashes only."),
+  "sales.paymentTermsDays": z.number().int().min(0).max(365),
+  "sales.quotationValidityDays": z.number().int().min(1).max(365),
+  "sales.documentTerms": z.string().trim().max(2000),
 };
 
 export type SettingKey = keyof typeof schemas;
@@ -27,12 +30,18 @@ const SETTING_DEFAULTS: SettingValues = {
   "general.dateFormat": "yyyy-MM-dd",
   "general.weekStartsOn": 1,
   "documents.invoiceNumberPrefix": "INV-",
+  "sales.paymentTermsDays": 30,
+  "sales.quotationValidityDays": 30,
+  "sales.documentTerms": "",
 };
 
 export const SETTING_DESCRIPTIONS: Record<SettingKey, string> = {
   "general.dateFormat": "How dates are displayed.",
   "general.weekStartsOn": "First day of the week (0 = Sunday … 6 = Saturday).",
   "documents.invoiceNumberPrefix": "Prefix for new invoice numbers, e.g. INV-.",
+  "sales.paymentTermsDays": "Default days until an invoice is due.",
+  "sales.quotationValidityDays": "Default days a quotation stays valid.",
+  "sales.documentTerms": "Default terms and conditions printed on quotations and invoices.",
 };
 
 export function isSettingKey(value: string): value is SettingKey {

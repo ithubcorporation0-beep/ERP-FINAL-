@@ -135,6 +135,22 @@ assertCanGrant(ctx, role.permissions);                  // privilege-escalation 
 Every check runs in the service (`authorize`) as well as in the page/action/route; hidden buttons are a
 convenience only.
 
+## Sales
+
+| Action                                                 | Permission                                  | Built-in roles (besides Super Admin / Admin)   |
+| ------------------------------------------------------ | ------------------------------------------- | ---------------------------------------------- |
+| See quotations and sales orders, download / print      | `quotations:view`                           | Manager, Accountant                            |
+| Create / duplicate quotations                          | `quotations:create`                         | Manager                                        |
+| Edit, send, share, confirm, decline, cancel            | `quotations:edit`                           | Manager                                        |
+| Delete (draft, declined or cancelled only)             | `quotations:delete`                         | Manager                                        |
+| Convert a quotation to an invoice                      | `quotations:edit` **and** `invoices:create` | Manager                                        |
+| See invoices; create; edit drafts, send, share, cancel | `invoices:view` / `create` / `edit`         | Accountant (all), Manager (view, create, edit) |
+| Delete a draft invoice                                 | `invoices:delete`                           | Accountant                                     |
+| See / record / void payments                           | `payments:view` / `create` / `delete`       | Accountant                                     |
+
+`quotations:*` is new in phase 07 — run `npm run db:seed` after deploying so existing companies' built-in roles get
+it. Share links (`/api/share/<token>`) are the only public sales URL: the token grants read access to one PDF.
+
 ## Dashboard widgets
 
 The dashboard needs `dashboard:view`; each widget additionally needs any one of its permissions in

@@ -20,6 +20,12 @@ export const PERMISSION_KEYS = [
   "leads:delete",
   "leads:export",
 
+  "quotations:view",
+  "quotations:create",
+  "quotations:edit",
+  "quotations:delete",
+  "quotations:export",
+
   "invoices:view",
   "invoices:create",
   "invoices:edit",
@@ -151,6 +157,7 @@ export const MODULE_LABELS: Record<Module, string> = {
   dashboard: "Dashboard",
   customers: "Customers",
   leads: "Leads",
+  quotations: "Quotations & sales orders",
   invoices: "Invoices",
   payments: "Payments",
   expenses: "Expenses",
@@ -266,6 +273,7 @@ export const DEFAULT_ROLES: Record<string, DefaultRole> = {
       "dashboard:view",
       "customers:*",
       "leads:*",
+      "quotations:*",
       "invoices:view",
       "invoices:create",
       "invoices:edit",
@@ -296,6 +304,7 @@ export const DEFAULT_ROLES: Record<string, DefaultRole> = {
     description: "Invoices, payments, expenses and accounting.",
     permissions: [
       "dashboard:view",
+      "quotations:view",
       "invoices:*",
       "payments:*",
       "expenses:*",

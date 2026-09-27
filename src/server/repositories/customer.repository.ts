@@ -82,6 +82,16 @@ export const customerRepository = {
     return client.customer.findFirst({ where: { id, companyId, deletedAt: null }, select: detailSelect });
   },
 
+  /** Active customers for pickers (e.g. on quotations), alphabetical. */
+  listOptions(companyId: string, limit: number, client: DbClient = db) {
+    return client.customer.findMany({
+      where: { companyId, deletedAt: null, status: { not: "BLOCKED" } },
+      orderBy: { name: "asc" },
+      take: limit,
+      select: { id: true, number: true, name: true, companyName: true },
+    });
+  },
+
   /** Minimal lookup for pickers and links (e.g. "converted to CUS-0012"). */
   findSummary(companyId: string, id: string, client: DbClient = db) {
     return client.customer.findFirst({

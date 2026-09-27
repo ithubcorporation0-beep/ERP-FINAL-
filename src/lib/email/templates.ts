@@ -25,7 +25,30 @@ ${
   return { to, subject, text, html } satisfies EmailMessage;
 }
 
+export interface SalesDocumentEmail {
+  companyName: string;
+  /** "Invoice" or "Quotation". */
+  documentLabel: string;
+  code: string;
+  customerName: string;
+  /** Preformatted, e.g. "AED 1,250.00". */
+  total: string;
+  /** e.g. "Due on 30 Oct 2026" or "Valid until 30 Oct 2026". */
+  dateLine: string;
+  /** Optional personal message from the sender. */
+  message?: string;
+}
+
 export const emailTemplates = {
+  /** A quotation or invoice sent to a customer; the PDF is attached by the caller. */
+  salesDocument: (to: string, doc: SalesDocumentEmail) =>
+    layout(to, `${doc.documentLabel} ${doc.code} from ${doc.companyName}`, [
+      `Dear ${doc.customerName},`,
+      ...(doc.message ? [doc.message] : []),
+      `Please find attached ${doc.documentLabel.toLowerCase()} ${doc.code} for ${doc.total}. ${doc.dateLine}.`,
+      `Kind regards,\n${doc.companyName}`,
+    ]),
+
   verifyEmail: (to: string, name: string, url: string) =>
     layout(
       to,

@@ -10,6 +10,9 @@ import {
   type DashboardSource,
   type KpiId,
 } from "@/config/dashboard";
+import { formatRecordNumber } from "@/config/records";
+import { formatMoney } from "@/lib/format";
+import { money, subtractMoney } from "@/lib/money";
 import { resolveDateRange, type DateRangePreset, type ResolvedDateRange } from "@/lib/date-range";
 import { NotFoundError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
@@ -17,6 +20,8 @@ import { hasAnyPermission, hasPermission, type PermissionKey } from "@/lib/permi
 import { authorize, type TenantContext } from "@/lib/tenant";
 import { companyRepository } from "@/server/repositories/company.repository";
 import { customerRepository } from "@/server/repositories/customer.repository";
+import { invoiceRepository } from "@/server/repositories/invoice.repository";
+import { paymentRepository } from "@/server/repositories/payment.repository";
 
 /**
  * Dashboard figures. Every number comes from a database query scoped to the current company; a widget whose
@@ -31,7 +36,8 @@ export type WidgetState<T> =
   | { status: "error" };
 
 export interface KpiData {
-  value: number;
+  /** Exact decimal string: a count ("12") or money ("1250.50", never a float). */
+  value: string;
   format: "currency" | "number";
   /** How many of `value` were added in the selected range (for running totals such as customers). */
   addedInRange?: number;
@@ -49,6 +55,8 @@ export interface ActivityItem {
   id: string;
   source: ActivityId;
   title: string;
+  /** Preformatted extra, e.g. the amount. */
+  detail?: string;
   /** ISO timestamp. */
   at: string;
 }
@@ -75,11 +83,40 @@ const kpiProviders: Partial<Record<KpiId, KpiProvider>> = {
       customerRepository.countActive(ctx.companyId),
       customerRepository.countActive(ctx.companyId, { from: range.from, to: range.to }),
     ]);
-    return { value, format: "number", addedInRange };
+    return { value: String(value), format: "number", addedInRange };
+  },
+
+  /** Revenue = issued invoices (sent, partially paid, paid) dated in the range. Drafts and cancelled don't count. */
+  async totalRevenue({ ctx, range }) {
+    const total = await invoiceRepository.sumIssued(ctx.companyId, calendarBounds(range));
+    return { value: money(total ?? "0"), format: "currency" };
+  },
+
+  /** What customers owe right now on open invoices (not limited to the range). */
+  async outstandingInvoices({ ctx }) {
+    const { total, paid } = await invoiceRepository.sumOutstanding(ctx.companyId);
+    return { value: subtractMoney(money(total ?? "0"), money(paid ?? "0")), format: "currency" };
   },
 };
 
 const chartProviders: Partial<Record<ChartId, ChartProvider>> = {
+  /** Issued invoice totals per month of the invoice date. */
+  async monthlySales({ ctx, range, locale }) {
+    const monthly = await invoiceRepository.sumIssuedByMonth(ctx.companyId, calendarBounds(range));
+    const totals = new Map(monthly.map((row) => [row.month, money(row.total)]));
+    const rows = range.months.map((month) => ({
+      month: month.key,
+      label: monthLabel(month.year, month.month, locale),
+      // Chart coordinates only — exact amounts are in the tables and KPIs.
+      values: { sales: Number(totals.get(month.key) ?? "0") },
+    }));
+    return {
+      series: [{ key: "sales", label: "Invoiced sales", kind: "bar" }],
+      rows,
+      hasData: rows.some((row) => row.values.sales !== 0),
+    };
+  },
+
   async customerGrowth({ ctx, range, locale, timeZone }) {
     const [before, monthly] = await Promise.all([
       customerRepository.countActive(ctx.companyId, { to: range.from }),
@@ -108,6 +145,28 @@ const chartProviders: Partial<Record<ChartId, ChartProvider>> = {
 };
 
 const activityProviders: Partial<Record<ActivityId, ActivityProvider>> = {
+  async newInvoices({ ctx, locale }, limit) {
+    const invoices = await invoiceRepository.listRecent(ctx.companyId, limit);
+    return invoices.map((invoice) => ({
+      id: `invoice:${invoice.id}`,
+      source: "newInvoices",
+      title: `${invoice.code} · ${invoice.customer.name}`,
+      detail: formatMoney(money(invoice.total), { locale, currency: invoice.currency }) ?? undefined,
+      at: invoice.createdAt.toISOString(),
+    }));
+  },
+
+  async payments({ ctx, locale }, limit) {
+    const payments = await paymentRepository.listRecent(ctx.companyId, limit);
+    return payments.map((payment) => ({
+      id: `payment:${payment.id}`,
+      source: "payments",
+      title: `${formatRecordNumber("payment", payment.number)} · ${payment.customer.name} (${payment.invoice.code})`,
+      detail: formatMoney(money(payment.amount), { locale, currency: payment.invoice.currency }) ?? undefined,
+      at: payment.createdAt.toISOString(),
+    }));
+  },
+
   async newCustomers({ ctx }, limit) {
     const customers = await customerRepository.listRecent(ctx.companyId, limit);
     return customers.map((customer) => ({
@@ -120,6 +179,16 @@ const activityProviders: Partial<Record<ActivityId, ActivityProvider>> = {
 };
 
 // ─── Helpers ───
+
+/** The range as calendar dates for DATE columns: first day of the first month, first day after the last. */
+function calendarBounds(range: ResolvedDateRange): { from: string; to: string } {
+  const first = range.months[0];
+  const last = range.months.at(-1);
+  if (!first || !last) throw new Error("Empty date range");
+  const next =
+    last.month === 12 ? { year: last.year + 1, month: 1 } : { year: last.year, month: last.month + 1 };
+  return { from: `${first.key}-01`, to: `${next.year}-${String(next.month).padStart(2, "0")}-01` };
+}
 
 function monthLabel(year: number, month: number, locale: string): string {
   return new Intl.DateTimeFormat(locale, { month: "short", year: "2-digit", timeZone: "UTC" }).format(

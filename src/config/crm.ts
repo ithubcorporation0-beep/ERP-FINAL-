@@ -90,16 +90,4 @@ export const COMMUNICATION_DIRECTION_LABELS: Record<CommunicationDirectionKey, s
   OUTBOUND: "Outbound",
 };
 
-/** Human-readable record numbers. The database stores the integer; the prefix is presentation only. */
-export const RECORD_PREFIXES = { customer: "CUS", lead: "LEAD" } as const;
-export type RecordKind = keyof typeof RECORD_PREFIXES;
-
-export function formatRecordNumber(kind: RecordKind, value: number): string {
-  return `${RECORD_PREFIXES[kind]}-${String(value).padStart(4, "0")}`;
-}
-
-/** "CUS-0012", "cus-12" or "12" → 12, so people can search by the ID they see. */
-export function parseRecordNumber(kind: RecordKind, text: string): number | undefined {
-  const match = new RegExp(`^(?:${RECORD_PREFIXES[kind]}-?)?0*(\\d{1,9})$`, "i").exec(text.trim());
-  return match?.[1] ? Number(match[1]) : undefined;
-}
+export { formatRecordNumber, parseRecordNumber, RECORD_PREFIXES, type RecordKind } from "./records";

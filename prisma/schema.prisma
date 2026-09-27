@@ -71,6 +71,12 @@ model Company {
   customerCommunications CustomerCommunication[]
   leads                  Lead[]
   numberSequences        NumberSequence[]
+  quotations             Quotation[]
+  quotationItems         QuotationItem[]
+  invoices               Invoice[]
+  invoiceItems           InvoiceItem[]
+  payments               Payment[]
+  shareLinks             ShareLink[]
   notifications          Notification[]
   authTokens             AuthToken[]
   sessions               Session[]
@@ -137,6 +143,13 @@ model User {
   leadsAssigned                 Lead[]                  @relation("LeadAssignedTo")
   leadsCreated                  Lead[]                  @relation("LeadCreatedBy")
   leadsUpdated                  Lead[]                  @relation("LeadUpdatedBy")
+  quotationsCreated             Quotation[]             @relation("QuotationCreatedBy")
+  quotationsUpdated             Quotation[]             @relation("QuotationUpdatedBy")
+  invoicesCreated               Invoice[]               @relation("InvoiceCreatedBy")
+  invoicesUpdated               Invoice[]               @relation("InvoiceUpdatedBy")
+  paymentsCreated               Payment[]               @relation("PaymentCreatedBy")
+  paymentsVoided                Payment[]               @relation("PaymentVoidedBy")
+  shareLinksCreated             ShareLink[]             @relation("ShareLinkCreatedBy")
   authTokensCreated             AuthToken[]             @relation("AuthTokenCreatedBy")
 
   @@map("users")
@@ -392,6 +405,9 @@ model Customer {
   documents      CustomerDocument[]
   communications CustomerCommunication[]
   convertedLeads Lead[]
+  quotations     Quotation[]
+  invoices       Invoice[]
+  payments       Payment[]
 
   @@unique([companyId, number])
   /// Target of composite foreign keys that keep children in the same company.
@@ -517,16 +533,254 @@ model Lead {
   updatedById     String?    @map("updated_by") @db.Uuid
   deletedAt       DateTime?  @map("deleted_at") @db.Timestamptz(3)
 
-  company    Company   @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  assignedTo User?     @relation("LeadAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
-  customer   Customer? @relation(fields: [customerId, companyId], references: [id, companyId], onDelete: Restrict)
-  createdBy  User?     @relation("LeadCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy  User?     @relation("LeadUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  assignedTo User?       @relation("LeadAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  customer   Customer?   @relation(fields: [customerId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy  User?       @relation("LeadCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy  User?       @relation("LeadUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  quotations Quotation[]
 
   @@unique([companyId, number])
+  /// Target of composite foreign keys (quotations created from a lead).
+  @@unique([id, companyId])
   @@index([companyId, deletedAt, status])
   @@index([companyId, assignedToId])
   @@map("leads")
+}
+
+// ─── Sales (phase 07) ────────────────────────────────────────
+// Money columns are NUMERIC(18,2) and are calculated with exact decimal arithmetic (src/lib/money.ts).
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  /// Accepted by the customer: the quotation is now a sales order (has an order number).
+  CONFIRMED
+  DECLINED
+  /// Converted into an invoice.
+  INVOICED
+  CANCELLED
+
+  @@map("quotation_status")
+}
+
+/// A quotation, which becomes a sales order when the customer confirms it (same record, `order_number` set).
+model Quotation {
+  id            String          @id @default(uuid(7)) @db.Uuid
+  companyId     String          @map("company_id") @db.Uuid
+  /// Quotation number ("QUO-0001"), per company.
+  number        Int
+  /// Sales order number ("SO-0001"), assigned on confirmation.
+  orderNumber   Int?            @map("order_number")
+  customerId    String          @map("customer_id") @db.Uuid
+  /// The lead this quotation came from, if any.
+  leadId        String?         @map("lead_id") @db.Uuid
+  quoteDate     DateTime        @map("quote_date") @db.Date
+  expiryDate    DateTime        @map("expiry_date") @db.Date
+  /// ISO 4217, copied from the company's base currency when created.
+  currency      String          @db.Char(3)
+  status        QuotationStatus @default(DRAFT)
+  subtotal      Decimal         @db.Decimal(18, 2)
+  discountTotal Decimal         @map("discount_total") @db.Decimal(18, 2)
+  taxTotal      Decimal         @map("tax_total") @db.Decimal(18, 2)
+  total         Decimal         @db.Decimal(18, 2)
+  notes         String?
+  terms         String?
+  sentAt        DateTime?       @map("sent_at") @db.Timestamptz(3)
+  confirmedAt   DateTime?       @map("confirmed_at") @db.Timestamptz(3)
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById   String?         @map("created_by") @db.Uuid
+  updatedById   String?         @map("updated_by") @db.Uuid
+  deletedAt     DateTime?       @map("deleted_at") @db.Timestamptz(3)
+
+  company   Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  customer  Customer        @relation(fields: [customerId, companyId], references: [id, companyId], onDelete: Restrict)
+  lead      Lead?           @relation(fields: [leadId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy User?           @relation("QuotationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?           @relation("QuotationUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  items     QuotationItem[]
+  invoices  Invoice[]
+
+  @@unique([companyId, number])
+  @@unique([companyId, orderNumber])
+  @@unique([id, companyId])
+  @@index([companyId, deletedAt, status])
+  @@index([companyId, customerId])
+  @@map("quotations")
+}
+
+model QuotationItem {
+  id              String  @id @default(uuid(7)) @db.Uuid
+  companyId       String  @map("company_id") @db.Uuid
+  quotationId     String  @map("quotation_id") @db.Uuid
+  /// Display order, 0-based.
+  position        Int
+  /// Product or service, as written on the document.
+  description     String
+  quantity        Decimal @db.Decimal(18, 3)
+  unitPrice       Decimal @map("unit_price") @db.Decimal(18, 2)
+  discountPercent Decimal @map("discount_percent") @db.Decimal(5, 2)
+  taxRate         Decimal @map("tax_rate") @db.Decimal(5, 2)
+  lineSubtotal    Decimal @map("line_subtotal") @db.Decimal(18, 2)
+  discountAmount  Decimal @map("discount_amount") @db.Decimal(18, 2)
+  taxAmount       Decimal @map("tax_amount") @db.Decimal(18, 2)
+  lineTotal       Decimal @map("line_total") @db.Decimal(18, 2)
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  quotation Quotation @relation(fields: [quotationId, companyId], references: [id, companyId], onDelete: Cascade)
+
+  @@index([companyId, quotationId, position])
+  @@map("quotation_items")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+
+  @@map("invoice_status")
+}
+
+/// A customer invoice. "Overdue" is not stored: it is SENT / PARTIALLY_PAID with a due date in the past.
+model Invoice {
+  id            String        @id @default(uuid(7)) @db.Uuid
+  companyId     String        @map("company_id") @db.Uuid
+  /// Sequence value; `code` is the invoice number as issued (prefix from settings + number), never changed.
+  number        Int
+  code          String
+  customerId    String        @map("customer_id") @db.Uuid
+  /// The quotation / sales order this invoice was created from, if any.
+  quotationId   String?       @map("quotation_id") @db.Uuid
+  invoiceDate   DateTime      @map("invoice_date") @db.Date
+  dueDate       DateTime      @map("due_date") @db.Date
+  currency      String        @db.Char(3)
+  status        InvoiceStatus @default(DRAFT)
+  subtotal      Decimal       @db.Decimal(18, 2)
+  discountTotal Decimal       @map("discount_total") @db.Decimal(18, 2)
+  taxTotal      Decimal       @map("tax_total") @db.Decimal(18, 2)
+  total         Decimal       @db.Decimal(18, 2)
+  /// Sum of the non-voided payments; kept in the same transaction as every payment change.
+  amountPaid    Decimal       @default(0) @map("amount_paid") @db.Decimal(18, 2)
+  notes         String?
+  terms         String?
+  sentAt        DateTime?     @map("sent_at") @db.Timestamptz(3)
+  cancelledAt   DateTime?     @map("cancelled_at") @db.Timestamptz(3)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById   String?       @map("created_by") @db.Uuid
+  updatedById   String?       @map("updated_by") @db.Uuid
+  deletedAt     DateTime?     @map("deleted_at") @db.Timestamptz(3)
+
+  company   Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  customer  Customer      @relation(fields: [customerId, companyId], references: [id, companyId], onDelete: Restrict)
+  quotation Quotation?    @relation(fields: [quotationId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy User?         @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?         @relation("InvoiceUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  items     InvoiceItem[]
+  payments  Payment[]
+
+  @@unique([companyId, number])
+  @@unique([companyId, code])
+  @@unique([id, companyId])
+  @@index([companyId, deletedAt, status, dueDate])
+  @@index([companyId, customerId])
+  @@index([companyId, invoiceDate])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id              String  @id @default(uuid(7)) @db.Uuid
+  companyId       String  @map("company_id") @db.Uuid
+  invoiceId       String  @map("invoice_id") @db.Uuid
+  position        Int
+  description     String
+  quantity        Decimal @db.Decimal(18, 3)
+  unitPrice       Decimal @map("unit_price") @db.Decimal(18, 2)
+  discountPercent Decimal @map("discount_percent") @db.Decimal(5, 2)
+  taxRate         Decimal @map("tax_rate") @db.Decimal(5, 2)
+  lineSubtotal    Decimal @map("line_subtotal") @db.Decimal(18, 2)
+  discountAmount  Decimal @map("discount_amount") @db.Decimal(18, 2)
+  taxAmount       Decimal @map("tax_amount") @db.Decimal(18, 2)
+  lineTotal       Decimal @map("line_total") @db.Decimal(18, 2)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  invoice Invoice @relation(fields: [invoiceId, companyId], references: [id, companyId], onDelete: Cascade)
+
+  @@index([companyId, invoiceId, position])
+  @@map("invoice_items")
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD
+  ONLINE
+  OTHER
+
+  @@map("payment_method")
+}
+
+/// Money received against an invoice. Never deleted: a mistaken payment is voided (with a reason).
+model Payment {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  companyId   String        @map("company_id") @db.Uuid
+  /// Payment ID ("PAY-0001"), per company.
+  number      Int
+  customerId  String        @map("customer_id") @db.Uuid
+  invoiceId   String        @map("invoice_id") @db.Uuid
+  amount      Decimal       @db.Decimal(18, 2)
+  method      PaymentMethod
+  reference   String?
+  paymentDate DateTime      @map("payment_date") @db.Date
+  notes       String?
+  voidedAt    DateTime?     @map("voided_at") @db.Timestamptz(3)
+  voidReason  String?       @map("void_reason")
+  voidedById  String?       @map("voided_by") @db.Uuid
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?       @map("created_by") @db.Uuid
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  customer  Customer @relation(fields: [customerId, companyId], references: [id, companyId], onDelete: Restrict)
+  invoice   Invoice  @relation(fields: [invoiceId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy User?    @relation("PaymentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  voidedBy  User?    @relation("PaymentVoidedBy", fields: [voidedById], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, number])
+  @@index([companyId, invoiceId])
+  @@index([companyId, customerId])
+  @@index([companyId, paymentDate])
+  @@map("payments")
+}
+
+enum ShareDocumentType {
+  QUOTATION
+  INVOICE
+
+  @@map("share_document_type")
+}
+
+/// A revocable, expiring link that lets someone without an account download one document's PDF (e.g. sent by
+/// WhatsApp). Only the SHA-256 hash of the token is stored.
+model ShareLink {
+  id             String            @id @default(uuid(7)) @db.Uuid
+  companyId      String            @map("company_id") @db.Uuid
+  documentType   ShareDocumentType @map("document_type")
+  documentId     String            @map("document_id") @db.Uuid
+  tokenHash      String            @unique @map("token_hash")
+  expiresAt      DateTime          @map("expires_at") @db.Timestamptz(3)
+  revokedAt      DateTime?         @map("revoked_at") @db.Timestamptz(3)
+  lastAccessedAt DateTime?         @map("last_accessed_at") @db.Timestamptz(3)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById    String?           @map("created_by") @db.Uuid
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("ShareLinkCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, documentType, documentId])
+  @@map("share_links")
 }
 
 /// Per-company counters for human-readable numbers (customers, leads; invoices later). Incremented atomically.

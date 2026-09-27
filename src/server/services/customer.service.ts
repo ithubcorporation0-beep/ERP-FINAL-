@@ -1,6 +1,7 @@
 import { formatRecordNumber } from "@/config/crm";
 import { db } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
+import { hasAnyPermission } from "@/lib/permissions";
 import { authorize, can, type TenantContext } from "@/lib/tenant";
 import type { CustomerInput, CustomerListQuery } from "@/lib/validation";
 import { customerRepository, type CustomerData } from "@/server/repositories/customer.repository";
@@ -66,6 +67,18 @@ export const customerService = {
   async list(ctx: TenantContext, query: CustomerListQuery) {
     authorize(ctx, "customers:view");
     return customerRepository.list(ctx.companyId, query);
+  },
+
+  /** Customers to choose from on sales documents (blocked customers are left out). */
+  async options(ctx: TenantContext) {
+    if (!hasAnyPermission(ctx.permissions, ["customers:view", "quotations:create", "invoices:create"])) {
+      authorize(ctx, "customers:view");
+    }
+    const customers = await customerRepository.listOptions(ctx.companyId, 1000);
+    return customers.map((customer) => ({
+      value: customer.id,
+      label: `${customer.name}${customer.companyName ? ` (${customer.companyName})` : ""} · ${formatRecordNumber("customer", customer.number)}`,
+    }));
   },
 
   async get(ctx: TenantContext, id: string) {

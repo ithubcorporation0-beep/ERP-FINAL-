@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { formatRecordNumber } from "@/config/crm";
 import { CustomerList } from "@/features/crm/customer-list";
-import { countryName, formatDate } from "@/features/crm/format";
+import { countryName, formatDate } from "@/lib/format";
 import { authorizePage } from "@/lib/auth/page";
 import { countryOptions } from "@/lib/intl";
 import { can } from "@/lib/tenant";

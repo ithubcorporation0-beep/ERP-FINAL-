@@ -7,6 +7,12 @@ import {
   LEAD_SOURCES,
   LEAD_STATUSES,
 } from "@/config/crm";
+import {
+  INVOICE_DISPLAY_STATUSES,
+  MAX_DOCUMENT_LINES,
+  PAYMENT_METHODS,
+  QUOTATION_DISPLAY_STATUSES,
+} from "@/config/sales";
 import { DATE_RANGE_PRESETS, DEFAULT_DATE_RANGE } from "@/lib/date-range";
 import { isCountryCode, isCurrencyCode, isLocale, isTimeZone } from "@/lib/intl";
 
@@ -140,6 +146,96 @@ export const leadListQuerySchema = paginationSchema.extend({
     .catch(undefined),
 });
 
+// ─── Sales ───
+
+/** Exact decimal strings (never JS numbers) — calculated with src/lib/money.ts. */
+const decimalText = (decimals: number, message: string) =>
+  z
+    .string()
+    .trim()
+    .regex(new RegExp(`^\\d{1,15}(\\.\\d{1,${decimals}})?$`), message);
+const percentText = decimalText(2, "Enter a percentage like 5 or 12.5.").refine(
+  (value) => Number(value) <= 100,
+  "Can't be more than 100%.",
+);
+
+export const lineItemSchema = z.object({
+  description: z.string().trim().min(1, "Describe the product or service.").max(500),
+  quantity: decimalText(3, "Enter a quantity like 1 or 2.5.").refine(
+    (value) => /[1-9]/.test(value),
+    "Must be more than 0.",
+  ),
+  unitPrice: decimalText(2, "Enter a price like 100 or 99.50."),
+  discountPercent: percentText,
+  taxRate: percentText,
+});
+
+const isoDate = z.iso.date("Enter a valid date.");
+
+/**
+ * A quotation or an invoice (same shape): `issueDate` is the quotation / invoice date and `endDate` the expiry /
+ * due date.
+ */
+export const salesDocumentSchema = z
+  .object({
+    customerId: idSchema,
+    /** Quotations only: the lead it came from ("" for none). */
+    leadId: z.union([z.literal(""), idSchema]).optional(),
+    issueDate: isoDate,
+    endDate: isoDate,
+    items: z
+      .array(lineItemSchema)
+      .min(1, "Add at least one line.")
+      .max(MAX_DOCUMENT_LINES, `Use at most ${MAX_DOCUMENT_LINES} lines.`),
+    notes: optionalText(5000),
+    terms: optionalText(5000),
+  })
+  .refine((value) => value.endDate >= value.issueDate, {
+    message: "Must be on or after the document date.",
+    path: ["endDate"],
+  });
+
+export const quotationListQuerySchema = paginationSchema.extend({
+  status: listFilter(QUOTATION_DISPLAY_STATUSES),
+  /** Sales orders only (confirmed or invoiced quotations with an order number). */
+  orders: z.enum(["1"]).optional().catch(undefined),
+  customerId: idSchema.optional().catch(undefined),
+});
+
+export const invoiceListQuerySchema = paginationSchema.extend({
+  status: listFilter(INVOICE_DISPLAY_STATUSES),
+  customerId: idSchema.optional().catch(undefined),
+});
+
+export const paymentSchema = z.object({
+  invoiceId: idSchema,
+  amount: decimalText(2, "Enter an amount like 250 or 250.75.").refine(
+    (value) => /[1-9]/.test(value),
+    "Must be more than 0.",
+  ),
+  method: z.enum(PAYMENT_METHODS),
+  reference: optionalText(120),
+  paymentDate: isoDate,
+  notes: optionalText(2000),
+});
+
+export const voidPaymentSchema = z.object({
+  id: idSchema,
+  reason: z.string().trim().min(3, "Say why the payment is voided.").max(500),
+});
+
+export const paymentListQuerySchema = paginationSchema.extend({
+  method: listFilter(PAYMENT_METHODS),
+  customerId: idSchema.optional().catch(undefined),
+});
+
+/** Sending a document by email: the recipient defaults to the customer's email. */
+export const sendDocumentSchema = z.object({
+  id: idSchema,
+  to: z.email("Enter a valid email address.").toLowerCase().max(254),
+  message: optionalText(2000),
+});
+
 export const loginSchema = z.object({
   email: z.email("Enter a valid email address.").toLowerCase(),
   password: z.string().min(1, "Enter your password.").max(200),
@@ -246,6 +342,9 @@ export const preferencesSchema = z.object({
     .min(1)
     .max(10)
     .regex(/^[A-Z0-9-]+$/, "Use capital letters, digits and dashes only."),
+  paymentTermsDays: z.number().int().min(0, "Use 0 to 365 days.").max(365, "Use 0 to 365 days."),
+  quotationValidityDays: z.number().int().min(1, "Use 1 to 365 days.").max(365, "Use 1 to 365 days."),
+  documentTerms: z.string().trim().max(2000),
 });
 
 export type CompanyProfileInput = z.infer<typeof companyProfileSchema>;
@@ -258,6 +357,13 @@ export type CommunicationInput = z.infer<typeof communicationSchema>;
 export type CommunicationFormInput = z.infer<typeof communicationFormSchema>;
 export type LeadInput = z.infer<typeof leadSchema>;
 export type LeadListQuery = z.infer<typeof leadListQuerySchema>;
+export type LineItemInput = z.infer<typeof lineItemSchema>;
+export type SalesDocumentInput = z.infer<typeof salesDocumentSchema>;
+export type QuotationListQuery = z.infer<typeof quotationListQuerySchema>;
+export type InvoiceListQuery = z.infer<typeof invoiceListQuerySchema>;
+export type PaymentInput = z.infer<typeof paymentSchema>;
+export type PaymentListQuery = z.infer<typeof paymentListQuerySchema>;
+export type SendDocumentInput = z.infer<typeof sendDocumentSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

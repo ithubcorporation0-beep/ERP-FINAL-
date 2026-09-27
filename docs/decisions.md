@@ -254,3 +254,35 @@ checks the member belongs to the current company. A customer's invoices, payment
 "not tracked yet" with the delivering phase instead of showing sample rows. Customer documents are served only
 as downloads (`Content-Disposition: attachment`, `nosniff`, sandbox CSP) and their type is detected from the bytes,
 so an uploaded file can never run as a page of the app.
+
+## ADR-031: Exact money arithmetic with decimal strings and BigInt (phase 07)
+
+Amounts travel as decimal strings ("1250.50") from form to database (NUMERIC(18,2)) and are calculated with
+BigInt fixed-point integers in `src/lib/money.ts`: no binary floating point, identical results in the browser and
+on the server, and values beyond `Number.MAX_SAFE_INTEGER` cents stay exact. Rounding is half away from zero per
+line (subtotal, discount, tax), and document totals are the sums of the rounded lines, so every printed figure adds
+up. decimal.js was not added: the needed operations are few and the BigInt code has no dependency.
+
+## ADR-032: A sales order is a confirmed quotation (phase 07)
+
+Instead of copying a quotation into a separate order table, confirming it assigns a sales-order number to the same
+record (the approach Odoo uses). Lines and totals can't diverge, and the audit history covers both stages.
+Statuses that depend only on dates ("Expired" quotation, "Overdue" invoice) are derived when read, so no scheduled
+job is needed and they can't be stale; list filters apply the same rule in SQL.
+
+## ADR-033: Invoice numbers, payments and consistency (phase 07)
+
+Invoice numbers use the company prefix setting and a per-company counter, are stored as issued text and never
+change; issued invoices are cancelled rather than deleted (drafts can be deleted, which may leave a gap).
+Recording or voiding a payment locks the invoice row (`SELECT … FOR UPDATE`) in one transaction, recomputes
+`amount_paid` from the non-voided payments and sets the status — concurrent payments can't overpay. Database CHECK
+constraints back the same rules. Payments are voided with a reason instead of deleted.
+
+## ADR-034: PDFs with pdf-lib; sharing via expiring links (phase 07)
+
+pdf-lib (pure JavaScript, no headless browser) renders quotations and invoices on the server, so it works on
+serverless hosts. It uses the built-in Helvetica font, which covers Western European text; other scripts are
+replaced by "?" instead of failing — embedding a Unicode font (with Arabic shaping) is a later improvement. The
+same view model feeds the screen, the print page and the PDF. For WhatsApp, the app opens `wa.me` with a message
+that contains a share link: a random 256-bit token (only its hash is stored), 30-day expiry, revocable, limited to
+one document. A WhatsApp Business API integration can later send the same message from the server.

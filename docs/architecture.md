@@ -174,6 +174,31 @@ Invoices, payments and projects of a customer show "not tracked yet" until those
 rows). A lead's assignee must be an active member of the current company (checked in the service); it becomes a
 link to an employee record when HR ships.
 
+## Sales (quotations, sales orders, invoices, payments)
+
+**Workflow:** Lead → Quotation → Sales order → Invoice → Payment.
+
+| Step        | How                                                                                                                                                               |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Quotation   | `quotation.service.ts`; `QUO-0001`. DRAFT → SENT → CONFIRMED / DECLINED / CANCELLED. "Expired" is derived from the expiry date. Duplicate, email, WhatsApp, PDF   |
+| Sales order | The same record once confirmed: it gets `SO-0001` (`/sales/orders` lists them)                                                                                    |
+| Invoice     | `invoice.service.ts`; number = settings prefix + sequence (`INV-0001`), issued once. DRAFT (editable, deletable) → SENT → PARTIALLY_PAID → PAID, or CANCELLED     |
+| Payment     | `payment.service.ts`; `PAY-0001`. Locks the invoice row, refuses overpayment, recomputes amount paid and status; mistakes are voided with a reason, never deleted |
+
+- **Money** (`src/lib/money.ts`): decimal strings and BigInt fixed-point maths, rounding half away from zero per
+  line; the browser form uses the same code for live totals. Never use JS numbers for money (chart coordinates
+  are the only exception). NUMERIC(18,2) in the database, plus CHECK constraints (amount > 0, paid ≤ total, …).
+- **Documents:** `presentation()` builds one view model used by the detail page, the print page
+  (`/print/invoices/[id]`, no app shell) and the PDF (`src/lib/pdf/sales-document.ts`, pdf-lib).
+- **Email:** `sendEmail` supports attachments; `emailTemplates.salesDocument` is the message.
+- **WhatsApp:** `src/lib/sharing/whatsapp.ts` builds `wa.me` links; the message contains a share link
+  (`share-link.service.ts`, `/api/share/<token>`): 256-bit token, hash stored, 30-day expiry, revocable, and it can
+  only open that one document's PDF. A WhatsApp Business API sender can implement `WhatsAppSender` later.
+- **Dashboard:** revenue (issued invoices in the range), outstanding balance, monthly sales, new invoices and
+  payments now come from these tables.
+- **Forms:** defaults that server pages spread live in plain modules (`features/*/defaults.ts`), not in
+  `"use client"` files — a server component only sees a client module's exports as references.
+
 ## Backend conventions
 
 ### Authentication and authorization

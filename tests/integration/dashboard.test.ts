@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { ForbiddenError } from "@/lib/errors";
 import type { TenantContext } from "@/lib/tenant";
 import { customerService } from "@/server/services/customer.service";
+import { invoiceService } from "@/server/services/invoice.service";
+import { paymentService } from "@/server/services/payment.service";
 import { dashboardService } from "@/server/services/dashboard.service";
 import { addMember, createCompanyWithOwner } from "./helpers";
 import { rawDb } from "./raw-db";
@@ -38,7 +40,7 @@ describe("dashboard", () => {
     const { kpis, charts, activity } = await dashboard(a);
     expect(kpis.find((kpi) => kpi.id === "totalCustomers")?.state).toEqual({
       status: "ready",
-      data: { value: 3, format: "number", addedInRange: 2 },
+      data: { value: "3", format: "number", addedInRange: 2 },
     });
 
     const growth = charts.find((chart) => chart.id === "customerGrowth")?.state;
@@ -56,7 +58,7 @@ describe("dashboard", () => {
 
     const thisMonth = await dashboard(a, "this-month");
     expect(thisMonth.kpis.find((kpi) => kpi.id === "totalCustomers")?.state).toMatchObject({
-      data: { value: 3, addedInRange: 1 },
+      data: { value: "3", addedInRange: 1 },
     });
   });
 
@@ -77,23 +79,81 @@ describe("dashboard", () => {
     const { kpis, charts, activity } = await dashboard(ctx);
 
     expect(kpis).toHaveLength(9);
-    for (const kpi of kpis.filter((item) => item.id !== "totalCustomers")) {
+    const built = ["totalCustomers", "totalRevenue", "outstandingInvoices"];
+    for (const kpi of kpis.filter((item) => !built.includes(item.id))) {
       expect(kpi.state).toMatchObject({ status: "unavailable", module: expect.any(String) });
     }
-    expect(kpis.find((kpi) => kpi.id === "totalCustomers")?.state).toMatchObject({ data: { value: 0 } });
+    // Real zeros from real (empty) tables — not placeholders.
+    expect(kpis.find((kpi) => kpi.id === "totalCustomers")?.state).toMatchObject({ data: { value: "0" } });
+    expect(kpis.find((kpi) => kpi.id === "totalRevenue")?.state).toMatchObject({ data: { value: "0.00" } });
 
     const growth = charts.find((chart) => chart.id === "customerGrowth")?.state;
     expect(growth).toMatchObject({ status: "ready", data: { hasData: false } });
-    expect(charts.filter((chart) => chart.state.status === "unavailable")).toHaveLength(5);
+    expect(charts.filter((chart) => chart.state.status === "unavailable")).toHaveLength(4);
 
     expect(activity.items).toEqual([]);
     expect(activity.unavailable.map((source) => source.id)).toEqual([
-      "newInvoices",
-      "payments",
       "expenses",
       "employeeActivity",
       "projectUpdates",
     ]);
+  });
+
+  it("shows real revenue, outstanding balance, monthly sales and sales activity per company", async () => {
+    const ctx = await createCompanyWithOwner("Dash Sales");
+    const other = await createCompanyWithOwner("Dash Sales Other");
+    const line = (unitPrice: string) => [
+      { description: "Work", quantity: "1", unitPrice, discountPercent: "0", taxRate: "0" },
+    ];
+    const issue = async (owner: TenantContext, date: string, unitPrice: string) => {
+      const customer = await customerService.create(owner, { name: `Buyer ${date}` });
+      const invoice = await invoiceService.create(owner, {
+        customerId: customer.id,
+        issueDate: date,
+        endDate: date,
+        items: line(unitPrice),
+      });
+      await invoiceService.markSent(owner, invoice.id);
+      return invoice;
+    };
+    const may = await issue(ctx, "2026-05-10", "1000.10");
+    await issue(ctx, "2026-09-02", "0.20");
+    await issue(other, "2026-09-02", "999.00"); // another company: never counted
+    const customer = await customerService.create(ctx, { name: "Drafty" });
+    await invoiceService.create(ctx, {
+      customerId: customer.id,
+      issueDate: "2026-09-03",
+      endDate: "2026-09-03",
+      items: line("5"),
+    }); // draft: not revenue
+    await paymentService.record(ctx, {
+      invoiceId: may.id,
+      amount: "400.00",
+      method: "CASH",
+      paymentDate: "2026-09-10",
+    });
+
+    const { kpis, charts, activity } = await dashboard(ctx);
+    expect(kpis.find((kpi) => kpi.id === "totalRevenue")?.state).toMatchObject({
+      data: { value: "1000.30", format: "currency" },
+    });
+    expect(kpis.find((kpi) => kpi.id === "outstandingInvoices")?.state).toMatchObject({
+      data: { value: "600.30" },
+    });
+    const sales = charts.find((chart) => chart.id === "monthlySales")?.state;
+    if (sales?.status !== "ready") throw new Error("sales chart not ready");
+    expect(sales.data.rows.map((row) => [row.month, row.values.sales])).toEqual([
+      ["2026-04", 0],
+      ["2026-05", 1000.1],
+      ["2026-06", 0],
+      ["2026-07", 0],
+      ["2026-08", 0],
+      ["2026-09", 0.2],
+    ]);
+    expect(activity.items.filter((item) => item.source === "payments").map((item) => item.title)).toEqual([
+      "PAY-0001 · Buyer 2026-05-10 (INV-0001)",
+    ]);
+    expect(activity.items.filter((item) => item.source === "newInvoices")).toHaveLength(3);
   });
 
   it("shows each role only the widgets its permissions allow", async () => {

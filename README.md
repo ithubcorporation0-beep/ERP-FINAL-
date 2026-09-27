@@ -3,7 +3,7 @@
 A multi-company ERP (CRM, sales, finance, HR, payroll, projects, inventory, reports) built with
 **Next.js 16, TypeScript, Tailwind CSS, shadcn/ui, Prisma 7 and PostgreSQL**.
 
-> **Status:** Phase 06 — CRM customers and leads. ERP modules are built phase by phase; see
+> **Status:** Phase 07 — sales, invoices and payments. ERP modules are built phase by phase; see
 > [MASTER-ERP-BUILD-PLAN.md](MASTER-ERP-BUILD-PLAN.md).
 
 ## Prerequisites

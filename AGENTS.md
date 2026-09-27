@@ -42,6 +42,7 @@ Read `docs/architecture.md` before starting work.
 | Company settings                    | Registry `src/lib/settings/registry.ts` + `settingsService`                                                                                |
 | File uploads                        | `src/lib/storage` (`getStorage()`, `companyKey()`); keys always under `companies/<companyId>/`                                             |
 | Dashboard widgets                   | Declare in `src/config/dashboard.ts`; data from a provider in `dashboard.service.ts` (no provider = "not tracked yet", never fake numbers) |
+| Money                               | `src/lib/money.ts` (decimal strings + BigInt). Never calculate money with JS numbers                                                       |
 | New company-owned table             | Checklist in `docs/database.md` → Tenancy enforcement (incl. `TENANT_MODELS`)                                                              |
 | Database conventions                | `docs/database.md` (snake_case, UUID v7, `company_id`, audit columns, composite FKs)                                                       |
 | shadcn/ui primitives                | `src/components/ui` — add with `npx shadcn@latest add <name>`                                                                              |

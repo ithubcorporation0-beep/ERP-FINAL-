@@ -10,6 +10,7 @@ import { SelectInput } from "@/components/forms/select-input";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { FormStatus } from "@/features/auth/form-status";
 import { preferencesSchema, type PreferencesInput } from "@/lib/validation";
 import { updatePreferencesAction } from "@/server/actions/company.actions";
@@ -36,7 +37,14 @@ export function PreferencesForm({ defaults, readOnly }: { defaults: PreferencesI
   async function onSubmit(values: PreferencesInput) {
     const result = await updatePreferencesAction(values);
     if (!result.ok)
-      return applyActionError(form.setError, result, ["dateFormat", "weekStartsOn", "invoiceNumberPrefix"]);
+      return applyActionError(form.setError, result, [
+        "dateFormat",
+        "weekStartsOn",
+        "invoiceNumberPrefix",
+        "paymentTermsDays",
+        "quotationValidityDays",
+        "documentTerms",
+      ]);
     toast.success("Preferences saved.");
     form.reset(values);
   }
@@ -82,7 +90,45 @@ export function PreferencesForm({ defaults, readOnly }: { defaults: PreferencesI
               label="Invoice number prefix"
               render={({ field, control }) => <Input {...field} {...control} />}
             />
+            <FormField
+              control={form.control}
+              name="paymentTermsDays"
+              label="Payment terms (days)"
+              description="Default time until an invoice is due."
+              render={({ field, control }) => (
+                <Input
+                  type="number"
+                  min={0}
+                  max={365}
+                  {...field}
+                  onChange={(event) => field.onChange(event.target.valueAsNumber)}
+                  {...control}
+                />
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="quotationValidityDays"
+              label="Quotation validity (days)"
+              render={({ field, control }) => (
+                <Input
+                  type="number"
+                  min={1}
+                  max={365}
+                  {...field}
+                  onChange={(event) => field.onChange(event.target.valueAsNumber)}
+                  {...control}
+                />
+              )}
+            />
           </div>
+          <FormField
+            control={form.control}
+            name="documentTerms"
+            label="Default terms and conditions"
+            description="Printed on new quotations and invoices; can be changed on each document."
+            render={({ field, control }) => <Textarea rows={3} {...field} {...control} />}
+          />
           <FormStatus tone="error" message={errors.root?.message} />
           {readOnly ? null : (
             <div>

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
-import { CustomerForm, EMPTY_CUSTOMER } from "@/features/crm/customer-form";
+import { CustomerForm } from "@/features/crm/customer-form";
+import { EMPTY_CUSTOMER } from "@/features/crm/defaults";
 import { authorizePage } from "@/lib/auth/page";
 import { countryOptions } from "@/lib/intl";
 

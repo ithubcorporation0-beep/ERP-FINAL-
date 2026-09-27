@@ -24,12 +24,18 @@ required variable is missing or malformed, and prints which one — values are n
 
 `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` are only used by `npm run db:seed`, never by the running app.
 
+## Sending quotations and invoices
+
+Documents are emailed with `EMAIL_TRANSPORT=smtp` (the PDF is attached; replies go to the company email from
+Settings). WhatsApp sharing needs no configuration: it opens WhatsApp with a link to `APP_URL/api/share/<token>`,
+so `APP_URL` must be the public address customers can reach.
+
 ## Generic Node.js host
 
 ```bash
 npm ci                 # installs dependencies and generates the Prisma client
 npm run db:deploy      # apply database migrations
-npm run db:seed        # first deployment only
+npm run db:seed        # first deployment, and after any release that adds permissions (e.g. phase 07)
 npm run build
 npm start              # serves on port 3000 (override with PORT)
 ```

@@ -19,7 +19,7 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 | 04  | `feat(phase-04): implement multi-tenant company isolation`        | ✅     |
 | 05  | `feat(phase-05): implement ERP dashboard`                         | ✅     |
 | 06  | `feat(phase-06): implement CRM customers and leads`               | ✅     |
-| 07  | `feat(phase-07): implement sales`                                 | ⬜     |
+| 07  | `feat(phase-07): implement sales invoices and payments`           | ✅     |
 | 08  | `feat(phase-08): implement finance and accounting`                | ⬜     |
 | 09  | `feat(phase-09): implement HR`                                    | ⬜     |
 | 10  | `feat(phase-10): implement payroll`                               | ⬜     |
@@ -122,8 +122,14 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 
 ## Phase 07 — Sales
 
-- ⬜ Invoices with line items, tax, numbering, statuses
-- ⬜ Payments against invoices, invoice PDF and email
+- ✅ Workflow lead → quotation → sales order → invoice → payment
+- ✅ Quotations: lines with quantity, price, discount, tax; save, edit, duplicate, PDF, print, email, WhatsApp,
+  accept (sales order), decline, cancel, convert to invoice
+- ✅ Invoices: automatic numbering (company prefix), draft editing, statuses incl. derived Overdue, balance, notes,
+  terms, PDF, print, email, WhatsApp, cancel
+- ✅ Payments: methods, reference, date, notes; overpayment refused under concurrency; void with reason
+- ✅ Exact money arithmetic (BigInt), database CHECK constraints, audit logs, permissions (`quotations:*` added),
+  tenant isolation; dashboard revenue, outstanding, monthly sales and activity now real
 
 ## Phase 08 — Finance and accounting
 

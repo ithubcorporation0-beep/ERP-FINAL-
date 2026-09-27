@@ -1,6 +1,6 @@
 import type { KpiId } from "@/config/dashboard";
 import { KpiCard, KpiCardSkeleton } from "@/components/shared/kpi-card";
-import { formatCurrency } from "@/lib/utils";
+import { formatMoney } from "@/lib/format";
 import type { KpiData, WidgetState } from "@/server/services/dashboard.service";
 import { KPI_ICONS } from "./icons";
 import { UnavailableNote } from "@/components/shared/unavailable-note";
@@ -21,9 +21,8 @@ interface KpiGridProps {
 }
 
 function formatValue(data: KpiData, currency: string, locale: string): string {
-  return data.format === "currency"
-    ? formatCurrency(data.value, currency, locale)
-    : new Intl.NumberFormat(locale).format(data.value);
+  if (data.format === "currency") return formatMoney(data.value, { locale, currency }) ?? "";
+  return new Intl.NumberFormat(locale).format(BigInt(data.value));
 }
 
 const GRID = "grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4";

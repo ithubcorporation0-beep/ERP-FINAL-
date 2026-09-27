@@ -1,8 +1,8 @@
 import { formatRecordNumber, OPEN_LEAD_STATUSES, type LeadSourceKey, type LeadStatusKey } from "@/config/crm";
-import { zonedParts } from "@/lib/date-range";
+import { todayInZone } from "@/lib/date-range";
 import type { BoardLead } from "./lead-board";
 import type { LeadRow } from "./lead-list";
-import { formatCalendarDate, formatDate, formatMoney, type CompanyFormat } from "./format";
+import { formatCalendarDate, formatDate, formatMoney, type CompanyFormat } from "@/lib/format";
 
 /** The lead fields list and board views need (as returned by the lead repository). */
 interface LeadRecord {
@@ -19,10 +19,7 @@ interface LeadRecord {
 }
 
 /** Today's date ("YYYY-MM-DD") in the company's time zone. */
-export function companyToday(timeZone: string, now = new Date()): string {
-  const { year, month, day } = zonedParts(now, timeZone);
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
+export const companyToday = todayInZone;
 
 /** An open lead whose follow-up date is before today. */
 export function isFollowUpOverdue(lead: Pick<LeadRecord, "status" | "followUpDate">, today: string): boolean {

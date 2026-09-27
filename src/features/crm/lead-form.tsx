@@ -34,19 +34,6 @@ const FIELDS = [
 
 const UNASSIGNED = "none";
 
-export const EMPTY_LEAD: LeadInput = {
-  name: "",
-  companyName: "",
-  email: "",
-  phone: "",
-  source: "OTHER",
-  assignedToId: "",
-  status: "NEW",
-  expectedValue: "",
-  notes: "",
-  followUpDate: "",
-};
-
 interface LeadFormProps {
   leadId?: string;
   defaults: LeadInput;

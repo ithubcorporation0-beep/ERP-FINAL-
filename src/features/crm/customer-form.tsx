@@ -40,21 +40,6 @@ const FIELDS = [
   "notes",
 ] as const;
 
-export const EMPTY_CUSTOMER: CustomerInput = {
-  name: "",
-  companyName: "",
-  email: "",
-  phone: "",
-  whatsapp: "",
-  address: "",
-  city: "",
-  country: "",
-  taxId: "",
-  type: "BUSINESS",
-  status: "ACTIVE",
-  notes: "",
-};
-
 interface CustomerFormProps {
   /** Omit to create a new customer. */
   customerId?: string;

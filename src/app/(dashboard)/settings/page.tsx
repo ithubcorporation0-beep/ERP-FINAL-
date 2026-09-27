@@ -93,6 +93,9 @@ export default async function SettingsPage() {
               dateFormat: settings["general.dateFormat"],
               weekStartsOn: settings["general.weekStartsOn"],
               invoiceNumberPrefix: settings["documents.invoiceNumberPrefix"],
+              paymentTermsDays: settings["sales.paymentTermsDays"],
+              quotationValidityDays: settings["sales.quotationValidityDays"],
+              documentTerms: settings["sales.documentTerms"],
             }}
           />
         </CardContent>

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Pencil } from "lucide-react";
+import { FileText, Pencil } from "lucide-react";
 import Link from "next/link";
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageHeader } from "@/components/shared/page-header";
@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatRecordNumber, LEAD_SOURCE_LABELS, LEAD_STATUS_LABELS } from "@/config/crm";
 import { DeleteRecordButton } from "@/features/crm/delete-record-button";
 import { DetailList } from "@/features/crm/detail-list";
-import { formatCalendarDate, formatDate, formatDateTime, formatMoney } from "@/features/crm/format";
+import { formatCalendarDate, formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { HistoryList } from "@/features/crm/history-list";
 import { LEAD_STATUS_TONES } from "@/features/crm/labels";
 import { ConvertLeadButton, LeadStageControl } from "@/features/crm/lead-actions";
@@ -42,6 +42,14 @@ export default async function LeadPage({ params }: PageProps<"/crm/leads/[id]">)
         actions={
           <>
             {canConvert ? <ConvertLeadButton id={id} name={lead.name} /> : null}
+            {lead.customer && !lead.customer.deletedAt && can(ctx, "quotations:create") ? (
+              <Button asChild variant="outline">
+                <Link href={`/sales/quotations/new?customerId=${lead.customer.id}&leadId=${id}`}>
+                  <FileText aria-hidden="true" />
+                  Create quotation
+                </Link>
+              </Button>
+            ) : null}
             {canEdit ? (
               <Button asChild variant="outline">
                 <Link href={`/crm/leads/${id}/edit`}>
