@@ -221,3 +221,20 @@ persistent disk, so production defaults to `s3` and refuses to start without its
 disk can opt into `local`. Files are served through the app (tenant check on every request) rather than public
 bucket URLs; signed URLs can be added later for large files. Uploaded images are validated by their bytes; SVG is
 refused because it can carry scripts.
+
+## ADR-027: Dashboard widgets as registry + providers (phase 05)
+
+The PRD dashboard lists figures from modules that arrive in later phases. Instead of placeholder numbers, each
+widget is declared once (`src/config/dashboard.ts`: module, permissions) and gets its data from a provider in
+`dashboardService`; a widget without a provider is reported as `unavailable` and rendered as "not tracked yet".
+This keeps the page honest today and makes each later phase a local change (add a provider), with no dashboard
+rewrite. Widgets load independently (per-widget error handling, per-section streaming), so one failing query
+doesn't blank the page. Date ranges are month-based presets resolved in the company's time zone and fiscal year,
+because monthly charts and "this fiscal year" are what ERP users compare; arbitrary day ranges can be added in
+reports (phase 14).
+
+## ADR-028: Charts with Recharts via shadcn/ui (phase 05)
+
+The shadcn `chart` component (Recharts 3) matches the existing design system (theme tokens `--chart-1…5`, dark
+mode) and is responsive out of the box. Charts are client components fed plain serialisable data from the server;
+each one also renders a visually hidden table with the same numbers for screen readers.

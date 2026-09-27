@@ -17,7 +17,7 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 | 02  | `feat(phase-02): establish database and backend foundation`       | ✅     |
 | 03  | `feat(phase-03): implement authentication and RBAC`               | ✅     |
 | 04  | `feat(phase-04): implement multi-tenant company isolation`        | ✅     |
-| 05  | `feat(phase-05): implement dashboard`                             | ⬜     |
+| 05  | `feat(phase-05): implement ERP dashboard`                         | ✅     |
 | 06  | `feat(phase-06): implement CRM`                                   | 🟡     |
 | 07  | `feat(phase-07): implement sales`                                 | ⬜     |
 | 08  | `feat(phase-08): implement finance and accounting`                | ⬜     |
@@ -99,7 +99,15 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 
 ## Phase 05 — Dashboard
 
-- ⬜ KPI tiles and charts from real data (revenue, receivables, cash, headcount, open tasks)
+- ✅ Widget registry (`src/config/dashboard.ts`): 9 KPIs, 6 charts, 6 activity sources, 7 quick actions, each with
+  the permissions that grant it — filtered on the server
+- ✅ Real data where the module exists (customers: total, new in range, growth chart, recent activity); every other
+  widget reports "not tracked yet" with its module and phase — no invented figures
+- ✅ Date filter (month-based presets incl. fiscal year, in the company's time zone), kept in the URL
+- ✅ Responsive charts (Recharts via shadcn chart) with screen-reader tables; loading skeletons per section,
+  empty states, per-widget error states with retry
+- ⬜ Later phases add a provider per widget as their module ships (Sales 07, Finance 08, HR 09, Projects 11,
+  Inventory 12) and set the quick-action `href` once the create screen exists
 
 ## Phase 06 — CRM
 

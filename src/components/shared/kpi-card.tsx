@@ -20,6 +20,8 @@ interface KpiCardProps {
   icon?: LucideIcon;
   change?: KpiChange;
   hint?: string;
+  /** Extra content under the value, e.g. a "not available yet" note or a retry button. */
+  footer?: React.ReactNode;
   className?: string;
 }
 
@@ -30,7 +32,7 @@ const SENTIMENT_CLASS = {
   neutral: "text-muted-foreground",
 } as const;
 
-export function KpiCard({ label, value, icon: Icon, change, hint, className }: KpiCardProps) {
+export function KpiCard({ label, value, icon: Icon, change, hint, footer, className }: KpiCardProps) {
   const ChangeIcon = change ? DIRECTION_ICON[change.direction] : null;
   return (
     <Card className={cn("gap-3 p-5 shadow-xs", className)}>
@@ -65,6 +67,7 @@ export function KpiCard({ label, value, icon: Icon, change, hint, className }: K
           {hint ? <span>{hint}</span> : null}
         </p>
       ) : null}
+      {footer}
     </Card>
   );
 }

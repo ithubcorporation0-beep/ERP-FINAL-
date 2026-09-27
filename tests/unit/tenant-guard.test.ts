@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { TENANT_MODELS, TenantScopeError, assertTenantScoped } from "@/lib/db/tenant-guard";
 
 const COMPANY = "0192a1f0-0000-7000-8000-000000000001";
@@ -67,5 +67,19 @@ describe("tenant guard (assertTenantScoped)", () => {
   it("ignores tables that are not company-owned", () => {
     expect(() => assertTenantScoped("User", "findMany", {})).not.toThrow();
     expect(() => assertTenantScoped("Permission", "deleteMany", {})).not.toThrow();
+  });
+});
+
+describe("crossTenant scope", () => {
+  it("is shared by every copy of the module (dev hot reload / duplicate bundling)", async () => {
+    const first = await import("@/lib/db/tenant-guard");
+    vi.resetModules();
+    const second = await import("@/lib/db/tenant-guard");
+    expect(second).not.toBe(first);
+    // A client created with the first copy's guard must see a scope opened by the second copy.
+    await second.crossTenant("test", async () => {
+      expect(first.isCrossTenant()).toBe(true);
+    });
+    expect(first.isCrossTenant()).toBe(false);
   });
 });

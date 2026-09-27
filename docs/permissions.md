@@ -120,6 +120,22 @@ assertCanGrant(ctx, role.permissions);                  // privilege-escalation 
 `/settings` needs `settings:view` (Super Admin, Admin); changing the company profile, logo or preferences needs
 `settings:manage` (Super Admin only by default). Admins see the page read-only.
 
+## Dashboard widgets
+
+The dashboard needs `dashboard:view`; each widget additionally needs any one of its permissions in
+`src/config/dashboard.ts`, checked in `dashboardService` (hidden widgets are never queried). Examples with the
+built-in roles:
+
+| Role        | Sees                                                                                     |
+| ----------- | ---------------------------------------------------------------------------------------- |
+| Super Admin | Everything                                                                               |
+| Accountant  | Revenue, expenses, net profit, outstanding invoices, customers, finance and sales charts |
+| HR Manager  | Employees, attendance                                                                    |
+| Manager     | Revenue, outstanding invoices, customers, expenses (approver), projects, tasks           |
+| Employee    | Active projects, pending tasks, project status, "Add expense" (no company-wide money)    |
+
+Quick actions need the module's `create` permission (e.g. `invoices:create` for "Create invoice").
+
 ## Adding a permission
 
 1. Add the key to `PERMISSION_KEYS` in `src/lib/permissions/index.ts` (and its module label if new).

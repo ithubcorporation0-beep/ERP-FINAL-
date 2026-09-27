@@ -61,7 +61,10 @@ Company data is protected at several levels (overview in `docs/architecture.md` 
    about a user's _own_ memberships (default company, company switcher list, activating invitations).
 
 Not covered by the guard (review these by hand): raw SQL (`$queryRaw`, `$executeRaw`) and nested relation queries
-(they are reached through an already-scoped parent). PostgreSQL row-level security can be added later as a sixth
+(they are reached through an already-scoped parent). Raw SQL is used only where Prisma can't express the query
+(today: `customerRepository.countCreatedByMonth`, grouping by month in the company's time zone); it always filters
+`company_id = ${companyId}` explicitly, uses tagged-template parameters (never string concatenation), validates the
+rows with Zod, and has an isolation test. PostgreSQL row-level security can be added later as a sixth
 layer (see ADR-024).
 
 **New company-owned table checklist:** `company_id` column + index → composite FK for children → add the model to

@@ -88,7 +88,14 @@ export function assertTenantScoped(model: string, operation: string, args: unkno
   throw new TenantScopeError(model, operation, "operation is not allowed on tenant-owned models");
 }
 
-const crossTenantScope = new AsyncLocalStorage<string>();
+declare global {
+  // One scope per process. The Prisma client is cached on globalThis in development (see ./index.ts), so after a
+  // hot reload — or when a bundler loads this module more than once — the cached client's guard and a fresh copy
+  // of crossTenant() must still share the same scope, or deliberate cross-company queries get rejected.
+  var __erpCrossTenantScope: AsyncLocalStorage<string> | undefined;
+}
+
+const crossTenantScope = (globalThis.__erpCrossTenantScope ??= new AsyncLocalStorage<string>());
 
 /**
  * Runs deliberately cross-company queries — e.g. "which companies does this user belong to?" — past the tenant

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DATE_RANGE_PRESETS, DEFAULT_DATE_RANGE } from "@/lib/date-range";
 import { isCountryCode, isCurrencyCode, isLocale, isTimeZone } from "@/lib/intl";
 
 /** Route/record ids are UUIDs; validating first turns bad ids into a 404 instead of a database error. */
@@ -8,6 +9,14 @@ export const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().trim().optional(),
+});
+
+/**
+ * Dashboard URL query (`?range=last-12-months`). A missing, repeated or unknown value falls back to the default
+ * range instead of failing, because it comes from an editable URL.
+ */
+export const dashboardQuerySchema = z.object({
+  range: z.enum(DATE_RANGE_PRESETS).catch(DEFAULT_DATE_RANGE),
 });
 
 export const customerSchema = z.object({
@@ -129,6 +138,7 @@ export const preferencesSchema = z.object({
 export type CompanyProfileInput = z.infer<typeof companyProfileSchema>;
 export type PreferencesInput = z.infer<typeof preferencesSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
+export type DashboardQuery = z.infer<typeof dashboardQuerySchema>;
 export type CustomerInput = z.infer<typeof customerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
