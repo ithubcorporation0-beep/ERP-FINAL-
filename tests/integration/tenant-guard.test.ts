@@ -13,7 +13,7 @@ describe("tenant guard on the real database client", () => {
     await expect(
       db.customer.upsert({
         where: { id: crypto.randomUUID() },
-        create: { companyId: ctx.companyId, name: "x" },
+        create: { companyId: ctx.companyId, number: 1, name: "x" },
         update: { name: "x" },
       }),
     ).rejects.toBeInstanceOf(TenantScopeError);

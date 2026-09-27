@@ -12,6 +12,10 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   "Membership",
   "Setting",
   "Customer",
+  "CustomerDocument",
+  "CustomerCommunication",
+  "Lead",
+  "NumberSequence",
   "Notification",
   "AuditLog",
 ]);

@@ -6,7 +6,19 @@ const COMPANY = "0192a1f0-0000-7000-8000-000000000001";
 describe("tenant guard (assertTenantScoped)", () => {
   it("covers every company-owned table", () => {
     expect([...TENANT_MODELS].sort()).toEqual(
-      ["AuditLog", "Customer", "Membership", "Notification", "Role", "RolePermission", "Setting"].sort(),
+      [
+        "AuditLog",
+        "Customer",
+        "CustomerCommunication",
+        "CustomerDocument",
+        "Lead",
+        "Membership",
+        "Notification",
+        "NumberSequence",
+        "Role",
+        "RolePermission",
+        "Setting",
+      ].sort(),
     );
   });
 

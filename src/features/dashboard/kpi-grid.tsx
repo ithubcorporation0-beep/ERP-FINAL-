@@ -3,7 +3,8 @@ import { KpiCard, KpiCardSkeleton } from "@/components/shared/kpi-card";
 import { formatCurrency } from "@/lib/utils";
 import type { KpiData, WidgetState } from "@/server/services/dashboard.service";
 import { KPI_ICONS } from "./icons";
-import { UnavailableNote, WidgetError } from "./widget-states";
+import { UnavailableNote } from "@/components/shared/unavailable-note";
+import { WidgetError } from "./widget-states";
 
 export interface KpiWidget {
   id: KpiId;

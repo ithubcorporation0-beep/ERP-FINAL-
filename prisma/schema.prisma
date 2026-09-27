@@ -59,17 +59,21 @@ model Company {
   updatedById          String?       @map("updated_by") @db.Uuid
   deletedAt            DateTime?     @map("deleted_at") @db.Timestamptz(3)
 
-  createdBy       User?            @relation("CompanyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy       User?            @relation("CompanyUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  memberships     Membership[]
-  roles           Role[]
-  rolePermissions RolePermission[]
-  settings        Setting[]
-  auditLogs       AuditLog[]
-  customers       Customer[]
-  notifications   Notification[]
-  authTokens      AuthToken[]
-  sessions        Session[]
+  createdBy              User?                   @relation("CompanyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy              User?                   @relation("CompanyUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  memberships            Membership[]
+  roles                  Role[]
+  rolePermissions        RolePermission[]
+  settings               Setting[]
+  auditLogs              AuditLog[]
+  customers              Customer[]
+  customerDocuments      CustomerDocument[]
+  customerCommunications CustomerCommunication[]
+  leads                  Lead[]
+  numberSequences        NumberSequence[]
+  notifications          Notification[]
+  authTokens             AuthToken[]
+  sessions               Session[]
 
   @@map("companies")
 }
@@ -115,20 +119,25 @@ model User {
   auditLogs     AuditLog[]
 
   // Back-relations for created_by / updated_by columns (required by Prisma, not used in code).
-  usersCreated           User[]           @relation("UserCreatedBy")
-  usersUpdated           User[]           @relation("UserUpdatedBy")
-  companiesCreated       Company[]        @relation("CompanyCreatedBy")
-  companiesUpdated       Company[]        @relation("CompanyUpdatedBy")
-  rolesCreated           Role[]           @relation("RoleCreatedBy")
-  rolesUpdated           Role[]           @relation("RoleUpdatedBy")
-  rolePermissionsCreated RolePermission[] @relation("RolePermissionCreatedBy")
-  membershipsCreated     Membership[]     @relation("MembershipCreatedBy")
-  membershipsUpdated     Membership[]     @relation("MembershipUpdatedBy")
-  settingsCreated        Setting[]        @relation("SettingCreatedBy")
-  settingsUpdated        Setting[]        @relation("SettingUpdatedBy")
-  customersCreated       Customer[]       @relation("CustomerCreatedBy")
-  customersUpdated       Customer[]       @relation("CustomerUpdatedBy")
-  authTokensCreated      AuthToken[]      @relation("AuthTokenCreatedBy")
+  usersCreated                  User[]                  @relation("UserCreatedBy")
+  usersUpdated                  User[]                  @relation("UserUpdatedBy")
+  companiesCreated              Company[]               @relation("CompanyCreatedBy")
+  companiesUpdated              Company[]               @relation("CompanyUpdatedBy")
+  rolesCreated                  Role[]                  @relation("RoleCreatedBy")
+  rolesUpdated                  Role[]                  @relation("RoleUpdatedBy")
+  rolePermissionsCreated        RolePermission[]        @relation("RolePermissionCreatedBy")
+  membershipsCreated            Membership[]            @relation("MembershipCreatedBy")
+  membershipsUpdated            Membership[]            @relation("MembershipUpdatedBy")
+  settingsCreated               Setting[]               @relation("SettingCreatedBy")
+  settingsUpdated               Setting[]               @relation("SettingUpdatedBy")
+  customersCreated              Customer[]              @relation("CustomerCreatedBy")
+  customersUpdated              Customer[]              @relation("CustomerUpdatedBy")
+  customerDocumentsCreated      CustomerDocument[]      @relation("CustomerDocumentCreatedBy")
+  customerCommunicationsCreated CustomerCommunication[] @relation("CustomerCommunicationCreatedBy")
+  leadsAssigned                 Lead[]                  @relation("LeadAssignedTo")
+  leadsCreated                  Lead[]                  @relation("LeadCreatedBy")
+  leadsUpdated                  Lead[]                  @relation("LeadUpdatedBy")
+  authTokensCreated             AuthToken[]             @relation("AuthTokenCreatedBy")
 
   @@map("users")
 }
@@ -334,28 +343,204 @@ model AuditLog {
 
 // ─── Platform records already used by the app ────────────────
 
-/// Reference module for the repository → service → route pattern (phase 06 extends it).
+// ─── CRM (phase 06) ──────────────────────────────────────────
+
+enum CustomerType {
+  INDIVIDUAL
+  BUSINESS
+
+  @@map("customer_type")
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+
+  @@map("customer_status")
+}
+
+/// Reference module for the repository → service → route pattern.
 model Customer {
-  id          String    @id @default(uuid(7)) @db.Uuid
-  companyId   String    @map("company_id") @db.Uuid
+  id          String         @id @default(uuid(7)) @db.Uuid
+  companyId   String         @map("company_id") @db.Uuid
+  /// Customer ID shown to people ("CUS-0001"): per-company sequence from `number_sequences` (key "customer").
+  number      Int
   name        String
+  /// Organisation the customer works for (for individuals) or trades as.
+  companyName String?        @map("company_name")
   email       String?
   phone       String?
+  whatsapp    String?
   address     String?
-  taxId       String?   @map("tax_id")
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
-  createdById String?   @map("created_by") @db.Uuid
-  updatedById String?   @map("updated_by") @db.Uuid
-  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  city        String?
+  /// ISO 3166-1 alpha-2.
+  country     String?        @db.Char(2)
+  taxId       String?        @map("tax_id")
+  type        CustomerType   @default(BUSINESS)
+  status      CustomerStatus @default(ACTIVE)
+  notes       String?
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById String?        @map("created_by") @db.Uuid
+  updatedById String?        @map("updated_by") @db.Uuid
+  deletedAt   DateTime?      @map("deleted_at") @db.Timestamptz(3)
 
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  createdBy User?   @relation("CustomerCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy User?   @relation("CustomerUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  company        Company                 @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdBy      User?                   @relation("CustomerCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy      User?                   @relation("CustomerUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  documents      CustomerDocument[]
+  communications CustomerCommunication[]
+  convertedLeads Lead[]
 
+  @@unique([companyId, number])
+  /// Target of composite foreign keys that keep children in the same company.
+  @@unique([id, companyId])
   @@index([companyId, deletedAt])
   @@index([companyId, name])
+  @@index([companyId, status])
   @@map("customers")
+}
+
+/// A file attached to a customer (contract, ID copy, …). The bytes live in file storage under `storage_key`.
+model CustomerDocument {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  customerId  String   @map("customer_id") @db.Uuid
+  /// Original file name, cleaned for display and downloads.
+  name        String
+  storageKey  String   @unique @map("storage_key")
+  contentType String   @map("content_type")
+  sizeBytes   Int      @map("size_bytes")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by") @db.Uuid
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  customer  Customer @relation(fields: [customerId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy User?    @relation("CustomerDocumentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, customerId, createdAt(sort: Desc)])
+  @@map("customer_documents")
+}
+
+enum CommunicationChannel {
+  NOTE
+  CALL
+  EMAIL
+  WHATSAPP
+  MEETING
+  SMS
+
+  @@map("communication_channel")
+}
+
+enum CommunicationDirection {
+  INBOUND
+  OUTBOUND
+
+  @@map("communication_direction")
+}
+
+/// Communication log and notes on a customer ("called about renewal", "sent quote by WhatsApp").
+model CustomerCommunication {
+  id          String                  @id @default(uuid(7)) @db.Uuid
+  companyId   String                  @map("company_id") @db.Uuid
+  customerId  String                  @map("customer_id") @db.Uuid
+  channel     CommunicationChannel
+  /// Null for internal notes.
+  direction   CommunicationDirection?
+  subject     String?
+  body        String
+  occurredAt  DateTime                @map("occurred_at") @db.Timestamptz(3)
+  createdAt   DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?                 @map("created_by") @db.Uuid
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  customer  Customer @relation(fields: [customerId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy User?    @relation("CustomerCommunicationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, customerId, occurredAt(sort: Desc)])
+  @@map("customer_communications")
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+
+  @@map("lead_status")
+}
+
+enum LeadSource {
+  WEBSITE
+  REFERRAL
+  SOCIAL_MEDIA
+  EMAIL_CAMPAIGN
+  PHONE
+  WALK_IN
+  EVENT
+  ADVERTISING
+  PARTNER
+  OTHER
+
+  @@map("lead_source")
+}
+
+/// A potential customer moving through the sales pipeline.
+model Lead {
+  id              String     @id @default(uuid(7)) @db.Uuid
+  companyId       String     @map("company_id") @db.Uuid
+  /// Lead ID shown to people ("LEAD-0001"): per-company sequence (key "lead").
+  number          Int
+  name            String
+  companyName     String?    @map("company_name")
+  phone           String?
+  email           String?
+  source          LeadSource @default(OTHER)
+  /// Company member responsible for the lead (becomes an employee link when HR ships). Checked in the service.
+  assignedToId    String?    @map("assigned_to") @db.Uuid
+  status          LeadStatus @default(NEW)
+  /// In the company's base currency.
+  expectedValue   Decimal?   @map("expected_value") @db.Decimal(18, 2)
+  notes           String?
+  followUpDate    DateTime?  @map("follow_up_date") @db.Date
+  statusChangedAt DateTime   @default(now()) @map("status_changed_at") @db.Timestamptz(3)
+  /// Set when the lead was converted into a customer.
+  customerId      String?    @map("customer_id") @db.Uuid
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById     String?    @map("created_by") @db.Uuid
+  updatedById     String?    @map("updated_by") @db.Uuid
+  deletedAt       DateTime?  @map("deleted_at") @db.Timestamptz(3)
+
+  company    Company   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  assignedTo User?     @relation("LeadAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  customer   Customer? @relation(fields: [customerId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy  User?     @relation("LeadCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy  User?     @relation("LeadUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, number])
+  @@index([companyId, deletedAt, status])
+  @@index([companyId, assignedToId])
+  @@map("leads")
+}
+
+/// Per-company counters for human-readable numbers (customers, leads; invoices later). Incremented atomically.
+model NumberSequence {
+  companyId String   @map("company_id") @db.Uuid
+  /// e.g. "customer", "lead".
+  key       String
+  lastValue Int      @default(0) @map("last_value")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@id([companyId, key])
+  @@map("number_sequences")
 }
 
 /// In-app notifications; the header bell shows the unread count (phase 13 adds the full feature).

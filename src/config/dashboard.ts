@@ -1,4 +1,5 @@
 import type { PermissionKey } from "@/lib/permissions";
+import { MODULE_RELEASES, type ModuleKey } from "./modules";
 
 /**
  * What the dashboard can show, and who may see it. Plain data (no React) so the server decides visibility and the
@@ -10,16 +11,8 @@ import type { PermissionKey } from "@/lib/permissions";
  */
 
 /** Modules the dashboard reads from, with the phase that delivers them (shown to users while unavailable). */
-export const DASHBOARD_SOURCES = {
-  customers: { label: "CRM", phase: 6 },
-  sales: { label: "Sales", phase: 7 },
-  finance: { label: "Finance", phase: 8 },
-  hr: { label: "HR", phase: 9 },
-  projects: { label: "Projects", phase: 11 },
-  inventory: { label: "Inventory", phase: 12 },
-} as const;
-
-export type DashboardSource = keyof typeof DASHBOARD_SOURCES;
+export const DASHBOARD_SOURCES = MODULE_RELEASES;
+export type DashboardSource = ModuleKey;
 
 interface WidgetDefinition<Id extends string> {
   id: Id;
@@ -170,7 +163,13 @@ interface QuickActionDefinition {
 }
 
 export const QUICK_ACTIONS: readonly QuickActionDefinition[] = [
-  { id: "addCustomer", label: "Add customer", source: "customers", permission: "customers:create" },
+  {
+    id: "addCustomer",
+    label: "Add customer",
+    source: "customers",
+    permission: "customers:create",
+    href: "/crm/customers/new",
+  },
   { id: "createInvoice", label: "Create invoice", source: "sales", permission: "invoices:create" },
   { id: "addExpense", label: "Add expense", source: "finance", permission: "expenses:create" },
   { id: "addEmployee", label: "Add employee", source: "hr", permission: "employees:create" },

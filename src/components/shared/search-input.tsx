@@ -26,18 +26,20 @@ export function SearchInput({
   const id = useId();
   const [value, setValue] = useState(defaultValue);
   const onSearchRef = useRef(onSearch);
-  const firstRun = useRef(true);
+  const reported = useRef(defaultValue.trim());
 
   useEffect(() => {
     onSearchRef.current = onSearch;
   }, [onSearch]);
 
   useEffect(() => {
-    if (firstRun.current) {
-      firstRun.current = false;
-      return;
-    }
-    const timer = setTimeout(() => onSearchRef.current(value.trim()), delay);
+    // Only report real changes. (A "first run" flag is not enough: React runs effects twice in development.)
+    const next = value.trim();
+    if (next === reported.current) return;
+    const timer = setTimeout(() => {
+      reported.current = next;
+      onSearchRef.current(next);
+    }, delay);
     return () => clearTimeout(timer);
   }, [value, delay]);
 

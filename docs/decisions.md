@@ -238,3 +238,19 @@ reports (phase 14).
 The shadcn `chart` component (Recharts 3) matches the existing design system (theme tokens `--chart-1…5`, dark
 mode) and is responsive out of the box. Charts are client components fed plain serialisable data from the server;
 each one also renders a visually hidden table with the same numbers for screen readers.
+
+## ADR-029: Per-company record numbers from a counter table (phase 06)
+
+Customer and lead IDs (`CUS-0001`, `LEAD-0001`) come from `number_sequences`, incremented with one atomic
+`INSERT … ON CONFLICT DO UPDATE … RETURNING` inside the transaction that creates the record: no duplicates under
+concurrency, no gaps from rolled-back creates, numbers never reused after deletes. `MAX(number)+1` was rejected
+(races) and PostgreSQL sequences were rejected (one per company and type, and they skip on rollback). Invoices will
+use the same counter.
+
+## ADR-030: CRM relations to modules that don't exist yet (phase 06)
+
+A lead's "assigned employee" is a company member (user) until the HR module adds employee records; the service
+checks the member belongs to the current company. A customer's invoices, payments and projects tabs say
+"not tracked yet" with the delivering phase instead of showing sample rows. Customer documents are served only
+as downloads (`Content-Disposition: attachment`, `nosniff`, sandbox CSP) and their type is detected from the bytes,
+so an uploaded file can never run as a page of the app.

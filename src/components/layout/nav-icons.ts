@@ -9,6 +9,7 @@ import {
   ScrollText,
   Settings,
   ShieldCheck,
+  Target,
   UserCog,
   Users,
   Wallet,
@@ -21,6 +22,7 @@ import type { NavIconName } from "@/config/navigation";
 export const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   dashboard: LayoutDashboard,
   customers: Users,
+  leads: Target,
   sales: ReceiptText,
   finance: Wallet,
   hr: BriefcaseBusiness,

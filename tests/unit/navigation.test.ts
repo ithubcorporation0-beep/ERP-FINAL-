@@ -41,9 +41,10 @@ describe("navigation", () => {
   });
 
   it("matches sub-pages to their module", () => {
-    expect(findNavItem("/crm")?.label).toBe("CRM");
-    expect(findNavItem("/crm/customers/123")?.label).toBe("CRM");
-    expect(findNavItem("/crm-other")).toBeUndefined();
+    expect(findNavItem("/crm/customers")?.label).toBe("Customers");
+    expect(findNavItem("/crm/customers/123/edit")?.label).toBe("Customers");
+    expect(findNavItem("/crm/leads/pipeline")?.label).toBe("Leads");
+    expect(findNavItem("/crm/customers-other")).toBeUndefined();
   });
 
   it("lands each role on the first page it may open, or the profile page", () => {

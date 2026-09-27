@@ -7,20 +7,10 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { FormStatus } from "@/features/auth/form-status";
-import type { ApiErrorBody } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/api-client";
 
 const ACCEPT = "image/png,image/jpeg,image/webp";
 const MAX_BYTES = 1024 * 1024;
-
-async function errorMessage(response: Response): Promise<string> {
-  try {
-    const body: Partial<ApiErrorBody> = await response.json();
-    return body.error?.message ?? `Upload failed (${response.status}).`;
-  } catch {
-    // Not a JSON error body (e.g. a proxy error page).
-    return `Upload failed (${response.status}).`;
-  }
-}
 
 /** Upload, preview and remove the company logo (PNG, JPEG or WebP, max 1 MB). The server re-validates everything. */
 export function LogoUploader({ logoUrl, readOnly }: { logoUrl: string | null; readOnly: boolean }) {
@@ -39,14 +29,14 @@ export function LogoUploader({ logoUrl, readOnly }: { logoUrl: string | null; re
     const response = await fetch("/api/company/logo", { method: "POST", body });
     setBusy(false);
     if (input.current) input.current.value = "";
-    if (!response.ok) return setError(await errorMessage(response));
+    if (!response.ok) return setError(await apiErrorMessage(response, "Upload"));
     toast.success("Logo updated.");
     router.refresh();
   }
 
   async function remove() {
     const response = await fetch("/api/company/logo", { method: "DELETE" });
-    if (!response.ok) throw new Error(await errorMessage(response));
+    if (!response.ok) throw new Error(await apiErrorMessage(response, "Upload"));
     toast.success("Logo removed.");
     router.refresh();
   }

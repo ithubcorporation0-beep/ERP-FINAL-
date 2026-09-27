@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { handle } from "@/lib/api";
 import { requirePermission } from "@/lib/tenant";
-import { customerSchema, paginationSchema } from "@/lib/validation";
+import { customerListQuerySchema, customerSchema } from "@/lib/validation";
 import { customerService } from "@/server/services/customer.service";
 
 export const GET = handle(async (req: Request) => {
   const ctx = await requirePermission("customers:view");
-  const query = paginationSchema.parse(Object.fromEntries(new URL(req.url).searchParams));
+  const query = customerListQuerySchema.parse(Object.fromEntries(new URL(req.url).searchParams));
   return NextResponse.json(await customerService.list(ctx, query));
 });
 

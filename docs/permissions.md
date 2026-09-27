@@ -120,6 +120,21 @@ assertCanGrant(ctx, role.permissions);                  // privilege-escalation 
 `/settings` needs `settings:view` (Super Admin, Admin); changing the company profile, logo or preferences needs
 `settings:manage` (Super Admin only by default). Admins see the page read-only.
 
+## CRM
+
+| Action                                                 | Permission                              | Built-in roles with it                  |
+| ------------------------------------------------------ | --------------------------------------- | --------------------------------------- |
+| See customers, their communication, documents, history | `customers:view`                        | Super Admin, Admin, Manager, Accountant |
+| Add a customer                                         | `customers:create`                      | Super Admin, Admin, Manager             |
+| Edit, log communication, upload/delete documents       | `customers:edit`                        | Super Admin, Admin, Manager             |
+| Delete a customer                                      | `customers:delete`                      | Super Admin, Admin, Manager             |
+| See leads and the pipeline                             | `leads:view`                            | Super Admin, Admin, Manager             |
+| Add / edit / move / delete leads                       | `leads:create` / `edit` / `delete`      | Super Admin, Admin, Manager             |
+| Convert a lead to a customer                           | `leads:edit` **and** `customers:create` | Super Admin, Admin, Manager             |
+
+Every check runs in the service (`authorize`) as well as in the page/action/route; hidden buttons are a
+convenience only.
+
 ## Dashboard widgets
 
 The dashboard needs `dashboard:view`; each widget additionally needs any one of its permissions in

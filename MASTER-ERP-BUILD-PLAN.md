@@ -18,7 +18,7 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 | 03  | `feat(phase-03): implement authentication and RBAC`               | ✅     |
 | 04  | `feat(phase-04): implement multi-tenant company isolation`        | ✅     |
 | 05  | `feat(phase-05): implement ERP dashboard`                         | ✅     |
-| 06  | `feat(phase-06): implement CRM`                                   | 🟡     |
+| 06  | `feat(phase-06): implement CRM customers and leads`               | ✅     |
 | 07  | `feat(phase-07): implement sales`                                 | ⬜     |
 | 08  | `feat(phase-08): implement finance and accounting`                | ⬜     |
 | 09  | `feat(phase-09): implement HR`                                    | ⬜     |
@@ -111,9 +111,14 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 
 ## Phase 06 — CRM
 
-- ✅ Customers API (audit, soft delete)
-- ⬜ Customers UI (list, create, edit, delete with confirmation)
-- ⬜ Leads pipeline (API + kanban UI, convert lead → customer)
+- ✅ Customers: all PRD fields (Customer ID, company, WhatsApp, city, country, tax number, type, status, notes),
+  list with search, filters, sort and pagination, detail page, form, delete with confirmation
+- ✅ Customer communication log and notes, documents (upload/download/delete), history from the audit log
+- ✅ Invoices / payments / projects tabs say "not tracked yet" until phases 07 and 11
+- ✅ Leads: all PRD fields, list with filters, kanban pipeline (drag and drop + keyboard menu), detail, form,
+  convert lead → customer
+- ✅ Per-company numbering, validation, audit logging, permission checks, tenant isolation; tests for CRUD,
+  permissions and isolation (integration + browser)
 
 ## Phase 07 — Sales
 

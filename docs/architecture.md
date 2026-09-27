@@ -158,6 +158,22 @@ Rules:
 integration tests (real figures, company isolation), and set the quick action's `href` once its create screen
 exists.
 
+## CRM (customers and leads)
+
+| Area                 | Where                                                                       | Notes                                                                                                                                 |
+| -------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Customers            | `/crm/customers` (list, new, `[id]`, `[id]/edit`), `api/customers/**`       | Search (name, company, email, phone, WhatsApp, city, Customer ID), filters (status, type, country), sort, pagination — all in the URL |
+| Communication, notes | `customer-communication.service.ts`                                         | Calls, emails, WhatsApp, meetings, SMS and notes on a customer's timeline                                                             |
+| Documents            | `customer-document.service.ts`, `api/customers/[id]/documents/**`           | Stored under `companies/<id>/customers/<customerId>/`; type detected from the bytes; always served as a download                      |
+| History              | `record-history.ts`                                                         | Built from the audit log: what happened, which fields changed, who, when                                                              |
+| Leads                | `/crm/leads` (list), `/crm/leads/pipeline` (kanban), `[id]`, `api/leads/**` | Drag and drop or a "Move to" menu (keyboard); moves are optimistic and saved by a server action                                       |
+| Conversion           | `leadService.convert`                                                       | One transaction: creates the customer, marks the lead Won, links both, audits both                                                    |
+| Numbers              | `numberSequenceRepository.next`, `formatRecordNumber`                       | `CUS-0001`, `LEAD-0001` per company; never reused; the prefix is presentation only                                                    |
+
+Invoices, payments and projects of a customer show "not tracked yet" until those modules exist (no placeholder
+rows). A lead's assignee must be an active member of the current company (checked in the service); it becomes a
+link to an employee record when HR ships.
+
 ## Backend conventions
 
 ### Authentication and authorization
@@ -295,8 +311,9 @@ Integration tests need `TEST_DATABASE_URL` (see [`database.md`](database.md#test
 ## Reference module
 
 `customers` is the fully wired reference implementation:
-`api/customers/route.ts` (+ `[id]/route.ts`, which validates the id with `idSchema`) →
-`customer.service.ts` → `customer.repository.ts`, with company scoping, audit columns, soft delete,
-audit log entries and integration tests (`tests/integration/tenant-isolation.test.ts`).
+`api/customers/route.ts` (+ `[id]/route.ts`, which validates the id with `routeId()`) →
+`customer.service.ts` (permission check, numbering, transaction + audit) → `customer.repository.ts`, with company
+scoping, audit columns, soft delete, pages with loading/empty/error states and integration tests
+(`tests/integration/crm-customers.test.ts`, `tests/integration/tenant-isolation.test.ts`).
 New modules copy this shape. The other API folders are permission-checked stubs that return `501`
 until their phase is implemented.

@@ -96,6 +96,16 @@ export const membershipRepository = {
     return client.membership.findFirst({ where: { id, companyId }, select: memberSelect });
   },
 
+  /** Active members as {id, name} (user id), for "assign to" pickers. */
+  async listActiveUsers(companyId: string, client: DbClient = db) {
+    const rows = await client.membership.findMany({
+      where: { companyId, status: "ACTIVE" },
+      select: { user: { select: { id: true, name: true } } },
+      orderBy: { user: { name: "asc" } },
+    });
+    return rows.map((row) => row.user);
+  },
+
   findByUser(companyId: string, userId: string, client: DbClient = db) {
     return client.membership.findUnique({
       where: { companyId_userId: { companyId, userId } },

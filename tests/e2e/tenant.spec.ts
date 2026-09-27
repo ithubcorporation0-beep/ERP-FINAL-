@@ -105,6 +105,8 @@ test.describe("company settings", () => {
   test("reject a disguised non-image upload", async ({ browser }) => {
     const page = await signedIn(browser, adminEmail, adminPassword);
     await page.goto("/settings");
+    // The file input only reacts once the page's scripts have loaded.
+    await page.waitForLoadState("networkidle");
     await page.getByLabel("Choose logo image").setInputFiles({
       name: "logo.png",
       mimeType: "image/png",

@@ -1,46 +1,115 @@
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
+import { parseRecordNumber } from "@/config/crm";
 import { db } from "@/lib/db";
-import type { CustomerInput, PaginationInput } from "@/lib/validation";
+import type { CustomerListQuery } from "@/lib/validation";
 import { createdBy, pageArgs, toPage, updatedBy, type ActorId, type DbClient } from "./helpers";
 
 const monthlyCountRows = z.array(z.object({ month: z.string(), count: z.number().int() }));
 
+/** Writable customer columns, already normalised by the service ("" → null). */
+export type CustomerData = Omit<
+  Prisma.CustomerUncheckedCreateInput,
+  "id" | "companyId" | "number" | "createdAt" | "updatedAt" | "createdById" | "updatedById" | "deletedAt"
+>;
+
+const listSelect = {
+  id: true,
+  number: true,
+  name: true,
+  companyName: true,
+  email: true,
+  phone: true,
+  city: true,
+  country: true,
+  type: true,
+  status: true,
+  createdAt: true,
+} as const;
+
+const detailSelect = {
+  ...listSelect,
+  whatsapp: true,
+  address: true,
+  taxId: true,
+  notes: true,
+  updatedAt: true,
+  createdBy: { select: { name: true } },
+  updatedBy: { select: { name: true } },
+} as const;
+
+function searchFilter(search: string | undefined): Prisma.CustomerWhereInput {
+  if (!search) return {};
+  const contains = { contains: search, mode: "insensitive" } as const;
+  const number = parseRecordNumber("customer", search);
+  return {
+    OR: [
+      { name: contains },
+      { companyName: contains },
+      { email: contains },
+      { phone: contains },
+      { whatsapp: contains },
+      { city: contains },
+      ...(number === undefined ? [] : [{ number }]),
+    ],
+  };
+}
+
 export const customerRepository = {
-  async list(companyId: string, query: PaginationInput, client: DbClient = db) {
+  async list(companyId: string, query: CustomerListQuery, client: DbClient = db) {
     const where: Prisma.CustomerWhereInput = {
       companyId,
       deletedAt: null,
-      ...(query.search ? { name: { contains: query.search, mode: "insensitive" } } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.type ? { type: query.type } : {}),
+      ...(query.country ? { country: query.country } : {}),
+      ...searchFilter(query.search),
     };
     const [items, total] = await Promise.all([
-      client.customer.findMany({ where, orderBy: { createdAt: "desc" }, ...pageArgs(query) }),
+      client.customer.findMany({
+        where,
+        select: listSelect,
+        // `number` breaks ties so paging is stable.
+        orderBy: [{ [query.sort]: query.dir }, { number: query.dir }],
+        ...pageArgs(query),
+      }),
       client.customer.count({ where }),
     ]);
     return toPage(items, total, query);
   },
 
   findById(companyId: string, id: string, client: DbClient = db) {
-    return client.customer.findFirst({ where: { id, companyId, deletedAt: null } });
+    return client.customer.findFirst({ where: { id, companyId, deletedAt: null }, select: detailSelect });
   },
 
-  create(companyId: string, data: CustomerInput, actorId: ActorId, client: DbClient = db) {
-    return client.customer.create({ data: { ...data, companyId, ...createdBy(actorId) } });
+  /** Minimal lookup for pickers and links (e.g. "converted to CUS-0012"). */
+  findSummary(companyId: string, id: string, client: DbClient = db) {
+    return client.customer.findFirst({
+      where: { id, companyId },
+      select: { id: true, number: true, name: true, deletedAt: true },
+    });
+  },
+
+  create(companyId: string, number: number, data: CustomerData, actorId: ActorId, client: DbClient = db) {
+    return client.customer.create({
+      data: { ...data, companyId, number, ...createdBy(actorId) },
+      select: detailSelect,
+    });
   },
 
   /** `companyId` in the filter guarantees a row of another company is never touched. */
   async update(
     companyId: string,
     id: string,
-    data: Partial<CustomerInput>,
+    data: Partial<CustomerData>,
     actorId: ActorId,
     client: DbClient = db,
   ) {
-    await client.customer.updateMany({
+    const { count } = await client.customer.updateMany({
       where: { id, companyId, deletedAt: null },
       data: { ...data, ...updatedBy(actorId) },
     });
-    return client.customer.findFirst({ where: { id, companyId } });
+    return count === 0 ? null : client.customer.findFirst({ where: { id, companyId }, select: detailSelect });
   },
 
   softDelete(companyId: string, id: string, actorId: ActorId, client: DbClient = db) {

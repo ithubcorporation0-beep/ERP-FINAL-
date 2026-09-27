@@ -10,7 +10,7 @@ import { customerService } from "@/server/services/customer.service";
 import { memberService } from "@/server/services/member.service";
 import { roleService } from "@/server/services/role.service";
 import { settingsService } from "@/server/services/settings.service";
-import { customerSchema } from "@/lib/validation";
+import { customerListQuerySchema, customerSchema } from "@/lib/validation";
 import { addMember, createCompanyWithOwner } from "./helpers";
 import { rawDb } from "./raw-db";
 
@@ -42,7 +42,7 @@ describe("Company A cannot read Company B data", () => {
   it("through services", async () => {
     const { a, b, customerOfB, customRoleOfB } = await twoCompanies();
 
-    expect((await customerService.list(a, page)).items).toEqual([]);
+    expect((await customerService.list(a, customerListQuerySchema.parse(page))).items).toEqual([]);
     await expect(customerService.get(a, customerOfB.id)).rejects.toBeInstanceOf(NotFoundError);
 
     const members = await memberService.list(a, page);
@@ -56,7 +56,7 @@ describe("Company A cannot read Company B data", () => {
     expect((await companyService.getProfile(a)).name).toBe("Company A");
 
     // B really has the data (the checks above are not passing because B is empty).
-    expect((await customerService.list(b, page)).total).toBe(1);
+    expect((await customerService.list(b, customerListQuerySchema.parse(page))).total).toBe(1);
   });
 
   it("through repositories, even when given B's ids", async () => {
@@ -145,13 +145,15 @@ describe("Company A cannot update Company B data", () => {
   });
 
   it("cannot move a record into another company", async () => {
-    const { a, customerOfB } = await twoCompanies();
+    const { a, b } = await twoCompanies();
     // Input schemas strip unknown keys, so a companyId smuggled into a request body never reaches the service…
-    const input = customerSchema.parse({ name: "Mine", companyId: customerOfB.companyId });
+    const input = customerSchema.parse({ name: "Mine", companyId: b.companyId });
     expect(input).not.toHaveProperty("companyId");
     // …and the repository always writes the caller's company anyway.
     const created = await customerService.create(a, input);
-    expect(created.companyId).toBe(a.companyId);
+    expect(await rawDb.customer.findUniqueOrThrow({ where: { id: created.id } })).toMatchObject({
+      companyId: a.companyId,
+    });
   });
 });
 
@@ -191,7 +193,7 @@ describe("own-company changes still work (the checks are not simply blocking eve
   it("stamps company, creator and audit trail", async () => {
     const ctx = await createCompanyWithOwner("Gamma");
     const created = await customerService.create(ctx, { name: "Initech", email: "ap@initech.test" });
-    expect(created).toMatchObject({
+    expect(await rawDb.customer.findUniqueOrThrow({ where: { id: created.id } })).toMatchObject({
       companyId: ctx.companyId,
       createdById: ctx.userId,
       updatedById: ctx.userId,

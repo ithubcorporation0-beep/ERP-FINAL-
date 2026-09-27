@@ -1,15 +1,13 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { AccessDenied } from "@/components/shared/access-denied";
-import { ModulePlaceholder } from "@/components/shared/module-placeholder";
-import { getNavItem } from "@/config/navigation";
 import { authorizePage } from "@/lib/auth/page";
+import { can } from "@/lib/tenant";
 
-export const metadata: Metadata = { title: "CRM" };
-
-const HREF = "/crm";
-
-export default async function CRMPage() {
-  // Server-side check: hiding the menu link is not protection.
-  if (!(await authorizePage(getNavItem(HREF).permission))) return <AccessDenied />;
-  return <ModulePlaceholder href={HREF} />;
+/** /crm opens the part of the CRM the user may see. */
+export default async function CrmPage() {
+  const ctx = await authorizePage();
+  if (!ctx) return <AccessDenied />;
+  if (can(ctx, "customers:view")) redirect("/crm/customers");
+  if (can(ctx, "leads:view")) redirect("/crm/leads");
+  return <AccessDenied />;
 }

@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MonthlyChartData, WidgetState } from "@/server/services/dashboard.service";
 import { MonthlyChart } from "./monthly-chart";
-import { UnavailableNote, WidgetError } from "./widget-states";
+import { UnavailableNote } from "@/components/shared/unavailable-note";
+import { WidgetError } from "./widget-states";
 
 export interface ChartWidget {
   id: ChartId;

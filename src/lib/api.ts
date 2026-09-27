@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { unstable_rethrow } from "next/navigation";
-import { toAppError, type ErrorCode } from "@/lib/errors";
+import { NotFoundError, toAppError, type ErrorCode } from "@/lib/errors";
+import { idSchema } from "@/lib/validation";
 import { logger } from "@/lib/logger";
 
 /** JSON body of every API error response. */
@@ -35,4 +36,11 @@ export function handle<A extends unknown[]>(fn: (...args: A) => Promise<Response
       return NextResponse.json(body, { status: error.status, headers: { "x-request-id": requestId } });
     }
   };
+}
+
+/** A record id from the URL. A malformed id can never match a record, so it is reported as "not found". */
+export function routeId(value: string, entity: string): string {
+  const parsed = idSchema.safeParse(value);
+  if (!parsed.success) throw new NotFoundError(entity);
+  return parsed.data;
 }

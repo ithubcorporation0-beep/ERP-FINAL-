@@ -47,6 +47,13 @@ export const companyService = {
   },
 
   /** The current company's profile. Always `ctx.companyId` — there is no way to ask for another company. */
+  /** How the current company formats numbers, money and dates. Any member may read it (no settings permission). */
+  async formatting(ctx: TenantContext) {
+    const company = await companyRepository.findById(ctx.companyId);
+    if (!company) throw new NotFoundError("Company");
+    return { locale: company.locale, timeZone: company.timezone, currency: company.baseCurrency };
+  },
+
   async getProfile(ctx: TenantContext) {
     authorize(ctx, "settings:view");
     const company = await companyRepository.findProfile(ctx.companyId);

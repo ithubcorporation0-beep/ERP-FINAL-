@@ -3,6 +3,7 @@ import { hasPermission, type PermissionKey } from "@/lib/permissions";
 export type NavIconName =
   | "dashboard"
   | "customers"
+  | "leads"
   | "sales"
   | "finance"
   | "hr"
@@ -56,11 +57,18 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Sales & CRM",
     items: [
       {
-        label: "CRM",
-        href: "/crm",
+        label: "Customers",
+        href: "/crm/customers",
         icon: "customers",
         permission: "customers:view",
-        description: "Customers, contacts and the lead pipeline.",
+        description: "Customer records, communication, documents and history.",
+      },
+      {
+        label: "Leads",
+        href: "/crm/leads",
+        icon: "leads",
+        permission: "leads:view",
+        description: "Potential customers and the sales pipeline.",
       },
       {
         label: "Sales",
