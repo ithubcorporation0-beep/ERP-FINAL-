@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { db } from "@/lib/db";
+import { rawDb } from "./raw-db";
 import { DEFAULT_ROLES, PERMISSION_CATALOG } from "@/lib/permissions";
 import { membershipRepository } from "@/server/repositories/membership.repository";
 import { companyService } from "@/server/services/company.service";
@@ -14,8 +14,8 @@ describe("companyService.bootstrap (seed workflow)", () => {
     const result = await companyService.bootstrap(input);
     expect(result).toMatchObject({ createdCompany: true, createdOwner: true });
 
-    expect(await db.permission.count()).toBe(PERMISSION_CATALOG.length);
-    const roles = await db.role.findMany({
+    expect(await rawDb.permission.count()).toBe(PERMISSION_CATALOG.length);
+    const roles = await rawDb.role.findMany({
       where: { companyId: result.company.id },
       orderBy: { name: "asc" },
     });
@@ -26,7 +26,7 @@ describe("companyService.bootstrap (seed workflow)", () => {
     expect(access?.roleName).toBe("Super Admin");
     expect(access?.permissions).toHaveLength(PERMISSION_CATALOG.length);
 
-    const owner = await db.user.findUniqueOrThrow({ where: { id: result.ownerId } });
+    const owner = await rawDb.user.findUniqueOrThrow({ where: { id: result.ownerId } });
     expect(owner.email).toBe("owner@acme.test");
     expect(owner.passwordHash).not.toContain("a-long-test-password");
   });
@@ -34,12 +34,12 @@ describe("companyService.bootstrap (seed workflow)", () => {
   it("is idempotent: running it again creates nothing new", async () => {
     await companyService.bootstrap(input);
     const counts = async () => ({
-      companies: await db.company.count(),
-      users: await db.user.count(),
-      roles: await db.role.count(),
-      rolePermissions: await db.rolePermission.count(),
-      memberships: await db.membership.count(),
-      auditLogs: await db.auditLog.count(),
+      companies: await rawDb.company.count(),
+      users: await rawDb.user.count(),
+      roles: await rawDb.role.count(),
+      rolePermissions: await rawDb.rolePermission.count(),
+      memberships: await rawDb.membership.count(),
+      auditLogs: await rawDb.auditLog.count(),
     });
     const first = await counts();
 
@@ -50,7 +50,7 @@ describe("companyService.bootstrap (seed workflow)", () => {
 
   it("records the creation in the audit log", async () => {
     const { company } = await companyService.bootstrap(input);
-    const actions = await db.auditLog.findMany({
+    const actions = await rawDb.auditLog.findMany({
       where: { companyId: company.id },
       select: { action: true },
     });

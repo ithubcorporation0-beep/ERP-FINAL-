@@ -9,7 +9,7 @@ import {
   type SettingValue,
   type SettingValues,
 } from "@/lib/settings/registry";
-import type { TenantContext } from "@/lib/tenant";
+import { authorize, type TenantContext } from "@/lib/tenant";
 import { settingRepository } from "@/server/repositories/setting.repository";
 import { writeAuditLog } from "./audit.service";
 
@@ -37,8 +37,9 @@ export const settingsService = {
     return (row && parseStored(key, row.value)) ?? defaultSettings()[key];
   },
 
-  /** Validates, saves and audits one setting. Callers must check `settings:update` first. */
+  /** Validates, saves and audits one setting. Requires `settings:manage`. */
   async set<K extends SettingKey>(ctx: TenantContext, key: K, value: unknown): Promise<SettingValue<K>> {
+    authorize(ctx, "settings:manage");
     const parsed = settingSchema(key).safeParse(value);
     if (!parsed.success) {
       throw new ValidationError(`Invalid value for ${key}.`, zodFieldErrors(parsed.error));

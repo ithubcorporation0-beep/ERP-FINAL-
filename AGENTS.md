@@ -18,7 +18,7 @@ Read `docs/architecture.md` before starting work.
 11. Validate every external input with Zod (`src/lib/validation`).
 12. Enforce authentication server-side.
 13. Enforce permissions server-side: `requirePermission("module:action")` in actions/API routes, `authorizePage("module:action")` in pages, `authorize(ctx, …)` in sensitive services. Never rely on hiding UI.
-14. Enforce tenant/company isolation server-side — every query is scoped by `companyId` (`company_id`).
+14. Enforce tenant/company isolation server-side — every query is scoped by `companyId` (`company_id`). The database client rejects unscoped queries on company-owned tables; deliberate exceptions use `crossTenant("reason", …)` in repositories only. Never take a company id from the request.
 15. Record important actions in audit logs (`writeAuditLog` from `@/server/services/audit.service`, in the same transaction as the change).
 16. Every module must have loading, empty, error and success states.
 17. Every destructive action must require confirmation (`ConfirmButton`).
@@ -40,6 +40,8 @@ Read `docs/architecture.md` before starting work.
 | Errors / logging                    | Throw `AppError`s from `@/lib/errors`; wrap routes in `handle()`, actions in `runAction()`; log with `@/lib/logger`                  |
 | Permissions / auth                  | Keys in `src/lib/permissions` (`PERMISSION_KEYS`); helpers in `src/lib/tenant` and `src/lib/auth/page.ts`; see `docs/permissions.md` |
 | Company settings                    | Registry `src/lib/settings/registry.ts` + `settingsService`                                                                          |
+| File uploads                        | `src/lib/storage` (`getStorage()`, `companyKey()`); keys always under `companies/<companyId>/`                                       |
+| New company-owned table             | Checklist in `docs/database.md` → Tenancy enforcement (incl. `TENANT_MODELS`)                                                        |
 | Database conventions                | `docs/database.md` (snake_case, UUID v7, `company_id`, audit columns, composite FKs)                                                 |
 | shadcn/ui primitives                | `src/components/ui` — add with `npx shadcn@latest add <name>`                                                                        |
 | Shared UI                           | `src/components/**` — no data access (ESLint enforces this)                                                                          |

@@ -12,11 +12,19 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import type { ShellCompany } from "@/server/services/shell.service";
+import { CompanySwitcher } from "./company-switcher";
 import { Logo } from "./logo";
 import { SidebarNav } from "./sidebar-nav";
 
 /** Hamburger menu shown below the `lg` breakpoint; slides the sidebar navigation in from the left. */
-export function MobileNav({ allowedHrefs }: { allowedHrefs: readonly string[] }) {
+interface MobileNavProps {
+  allowedHrefs: readonly string[];
+  company: ShellCompany & { logoUrl: string | null };
+  companies: ShellCompany[];
+}
+
+export function MobileNav({ allowedHrefs, company, companies }: MobileNavProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -36,6 +44,9 @@ export function MobileNav({ allowedHrefs }: { allowedHrefs: readonly string[] })
           <SheetDescription className="sr-only">Main navigation</SheetDescription>
         </SheetHeader>
         <ScrollArea className="min-h-0 flex-1">
+          <div className="border-b border-sidebar-border px-3 py-3">
+            <CompanySwitcher current={company} companies={companies} className="w-full" />
+          </div>
           <div className="px-3 py-4">
             <SidebarNav allowedHrefs={allowedHrefs} onNavigate={() => setOpen(false)} />
           </div>

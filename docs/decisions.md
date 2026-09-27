@@ -195,3 +195,29 @@ invitation") instead of silently failing or rolling back the saved change.
 `src/config/navigation.ts` holds icon _names_; `src/components/layout/nav-icons.ts` maps them to icon components.
 Server code (post-login landing page, permission-filtered menus) can import the config without pulling a UI
 library into server-only scripts such as the seed and e2e fixtures.
+
+## ADR-024: Tenant guard in the database client (phase 04)
+
+Scoping every query by `company_id` by convention alone fails the first time someone forgets a filter. A Prisma
+client extension therefore **rejects** any query on a company-owned model whose `where` (or insert data) lacks
+`companyId` — a tripwire rather than silent auto-injection, so the code stays explicit and readable and mistakes
+surface in tests immediately. Legitimate cross-company queries are wrapped in `crossTenant("reason", …)`
+(AsyncLocalStorage scope), allowed only in repositories (ESLint rule). Together with composite foreign keys this
+gives database-level integrity plus runtime query checks without PostgreSQL row-level security; RLS
+(`SET LOCAL app.company_id` per transaction + policies) remains an option for phase 16 as defense in depth.
+
+## ADR-025: Active company stored on the session (phase 04)
+
+The company switcher stores the choice on the session row (`sessions.active_company_id`), not in a cookie or URL:
+it can't be tampered with, it's per device, and it is re-validated against memberships on every request (a suspended
+membership falls back to the user's oldest company). URLs stay company-free, so links can be shared inside a company
+without leaking which tenant they belong to.
+
+## ADR-026: File storage abstraction (phase 04)
+
+A three-method `StorageDriver` (`put`/`get`/`delete`) with a local-folder driver and an S3-compatible driver
+(`aws4fetch`, ~7 kB, no dependencies — instead of the full AWS SDK). Serverless hosts (e.g. Vercel) have no
+persistent disk, so production defaults to `s3` and refuses to start without its settings; a single server with a
+disk can opt into `local`. Files are served through the app (tenant check on every request) rather than public
+bucket URLs; signed URLs can be added later for large files. Uploaded images are validated by their bytes; SVG is
+refused because it can carry scripts.

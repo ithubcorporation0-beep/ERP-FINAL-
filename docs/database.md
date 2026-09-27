@@ -3,7 +3,7 @@
 PostgreSQL (15+, developed on 16) through **Prisma 7**. Schema: `prisma/schema.prisma`.
 Prisma settings (connection URL, migrations folder, seed command): `prisma.config.ts`.
 
-## What exists today (phase 02)
+## What exists today (phases 02–04)
 
 The **core platform** tables. ERP module tables (invoices, employees, stock, …) are added by the
 phase that builds each module, so every table is designed with its real requirements.
@@ -18,20 +18,20 @@ companies ──┬── memberships ── users ──┬── sessions
             └── notifications
 ```
 
-| Table              | Tenant-owned                               | Purpose                                                                          |
-| ------------------ | ------------------------------------------ | -------------------------------------------------------------------------------- |
-| `companies`        | — (is the tenant)                          | A customer company: name, slug, status, currency, time zone, locale, fiscal year |
-| `users`            | no (global)                                | A person's login. Linked to companies through `memberships`                      |
-| `sessions`         | no                                         | Signed-in browser sessions (hashed tokens only; idle + absolute expiry)          |
-| `auth_tokens`      | no (optional `company_id` for invitations) | Single-use email links: verification, password reset, invitation (hashed)        |
-| `permissions`      | no (global)                                | Catalogue of `module:action` keys, synced from code                              |
-| `roles`            | `company_id`                               | Named permission sets per company (Owner, Admin, … + custom later)               |
-| `role_permissions` | `company_id`                               | Which permissions a role has                                                     |
-| `memberships`      | `company_id`                               | A user's access to a company, with exactly one role there                        |
-| `settings`         | `company_id`                               | Validated per-company preferences (key → JSON value)                             |
-| `audit_logs`       | `company_id` (null for sign-in events)     | Immutable history of important actions                                           |
-| `customers`        | `company_id`                               | Reference module for the repository → service → route pattern                    |
-| `notifications`    | `company_id`                               | In-app notifications (the header bell)                                           |
+| Table              | Tenant-owned                               | Purpose                                                                                                                                                  |
+| ------------------ | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `companies`        | — (is the tenant)                          | A customer company: name, legal name, tax id, contact details, country, base currency, time zone, locale, fiscal year, status, logo (storage key + type) |
+| `users`            | no (global)                                | A person's login. Linked to companies through `memberships`                                                                                              |
+| `sessions`         | no                                         | Signed-in browser sessions (hashed tokens only; idle + absolute expiry; `active_company_id` = company chosen in the switcher)                            |
+| `auth_tokens`      | no (optional `company_id` for invitations) | Single-use email links: verification, password reset, invitation (hashed)                                                                                |
+| `permissions`      | no (global)                                | Catalogue of `module:action` keys, synced from code                                                                                                      |
+| `roles`            | `company_id`                               | Named permission sets per company (Owner, Admin, … + custom later)                                                                                       |
+| `role_permissions` | `company_id`                               | Which permissions a role has                                                                                                                             |
+| `memberships`      | `company_id`                               | A user's access to a company, with exactly one role there                                                                                                |
+| `settings`         | `company_id`                               | Validated per-company preferences (key → JSON value)                                                                                                     |
+| `audit_logs`       | `company_id` (null for sign-in events)     | Immutable history of important actions                                                                                                                   |
+| `customers`        | `company_id`                               | Reference module for the repository → service → route pattern                                                                                            |
+| `notifications`    | `company_id`                               | In-app notifications (the header bell)                                                                                                                   |
 
 ## Conventions
 
@@ -45,6 +45,27 @@ companies ──┬── memberships ── users ──┬── sessions
 | Deleting              | Master data is soft-deleted (`deleted_at`). Companies are archived (`status`), never hard-deleted once they have audit history (`audit_logs` → `ON DELETE RESTRICT`). Business records use `RESTRICT` towards the company for the same reason.                                            |
 | Money (from phase 07) | `Decimal(14,2)` — never floating point. Quantities `Decimal(14,3)`. Currency = company `base_currency` unless a column says otherwise.                                                                                                                                                    |
 | Settings              | Never read raw `settings` rows: keys, types and defaults live in `src/lib/settings/registry.ts`; use `settingsService`. Only non-default values are stored.                                                                                                                               |
+
+## Tenancy enforcement
+
+Company data is protected at several levels (overview in `docs/architecture.md` → Multi-tenancy):
+
+1. **Schema:** `company_id` on every company-owned table (`roles`, `role_permissions`, `memberships`, `settings`,
+   `customers`, `notifications`, `audit_logs`), with composite foreign keys for children.
+2. **Repositories:** every function takes `companyId` first and filters by it, including `updateMany` / `deleteMany`
+   (a guessed id of another company updates or deletes **0 rows**).
+3. **Tenant guard** (`src/lib/db/tenant-guard.ts`): a Prisma client extension on the shared `db` client that throws
+   `TenantScopeError` for any query on those tables whose `where` (or insert data) has no `companyId` — including
+   inside transactions. It checks top-level `companyId` and compound unique keys such as `companyId_name`.
+   Intentional cross-company queries are wrapped in `crossTenant("reason", () => …)`; today there are three, all
+   about a user's _own_ memberships (default company, company switcher list, activating invitations).
+
+Not covered by the guard (review these by hand): raw SQL (`$queryRaw`, `$executeRaw`) and nested relation queries
+(they are reached through an already-scoped parent). PostgreSQL row-level security can be added later as a sixth
+layer (see ADR-024).
+
+**New company-owned table checklist:** `company_id` column + index → composite FK for children → add the model to
+`TENANT_MODELS` → repository functions with `companyId` first → isolation tests (read / update / delete).
 
 ## How the app talks to the database
 
@@ -104,7 +125,10 @@ Integration tests (`tests/integration`) run against **PostgreSQL, not mocks**:
 - Set `TEST_DATABASE_URL` to a separate database whose name contains `test` (the runner refuses any
   other name, because it empties the tables before each test).
 - `npm run test` runs them together with unit tests; `npm run test:integration` runs only them.
-- Migrations are applied automatically before the run. Without `TEST_DATABASE_URL` they are skipped
+- Migrations are applied automatically before the run.
+- Tests call the real services (which use the guarded `db`). To _inspect_ the database directly — e.g. "company B's
+  row is unchanged" — they use `rawDb` from `tests/integration/raw-db.ts`, an unguarded client that must never be
+  imported from `src/`. Without `TEST_DATABASE_URL` they are skipped
   with a warning; CI always runs them.
 
 ## Commands
@@ -122,7 +146,8 @@ Integration tests (`tests/integration`) run against **PostgreSQL, not mocks**:
 
 ## Migrations
 
-| Migration                      | Contents                                                                                                                                                                                                                                                                                                          |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `20260925184444_init`          | Core platform schema (phase 02). Replaced the phase-00 draft before any deployment — see ADR-015.                                                                                                                                                                                                                 |
-| `20260926172858_auth_and_rbac` | Phase 03: `auth_tokens`, user security columns (verification, lockout, profile), session absolute expiry. **Data migration:** permission verbs `read→view`, `update→edit`; role `Owner→Super Admin`; retired `Sales Rep` kept as a custom role; existing users marked verified. Run `npm run db:seed` afterwards. |
+| Migration                                 | Contents                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `20260925184444_init`                     | Core platform schema (phase 02). Replaced the phase-00 draft before any deployment — see ADR-015.                                                                                                                                                                                                                 |
+| `20260926172858_auth_and_rbac`            | Phase 03: `auth_tokens`, user security columns (verification, lockout, profile), session absolute expiry. **Data migration:** permission verbs `read→view`, `update→edit`; role `Owner→Super Admin`; retired `Sales Rep` kept as a custom role; existing users marked verified. Run `npm run db:seed` afterwards. |
+| `20260926181244_company_context_and_logo` | Phase 04: `sessions.active_company_id` (company switcher, `SET NULL` if the company is deleted); `companies.logo_key`, `logo_content_type`, `logo_updated_at`.                                                                                                                                                    |

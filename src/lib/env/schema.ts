@@ -44,6 +44,17 @@ const baseSchema = z.object({
   SMTP_PASSWORD: optional,
   EMAIL_FROM: optional,
 
+  /**
+   * Where uploaded files (company logos, later attachments) are kept: "local" (a folder on this server — dev and
+   * single-server installs) or "s3" (any S3-compatible service: AWS S3, Cloudflare R2, MinIO…).
+   * Default: s3 in production, local otherwise.
+   */
+  STORAGE_DRIVER: z
+    .enum(["local", "s3"])
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  STORAGE_LOCAL_DIR: z.string().trim().min(1).default(".storage"),
+  STORAGE_REGION: z.string().trim().min(1).default("auto"),
   STORAGE_ENDPOINT: optional,
   STORAGE_BUCKET: optional,
   STORAGE_ACCESS_KEY: optional,
@@ -54,6 +65,7 @@ export const serverEnvSchema = baseSchema
   .transform((env) => ({
     ...env,
     EMAIL_TRANSPORT: env.EMAIL_TRANSPORT ?? (env.NODE_ENV === "production" ? "smtp" : "console"),
+    STORAGE_DRIVER: env.STORAGE_DRIVER ?? (env.NODE_ENV === "production" ? "s3" : "local"),
   }))
   .superRefine((env, context) => {
     if (env.EMAIL_TRANSPORT === "smtp") {
@@ -63,6 +75,22 @@ export const serverEnvSchema = baseSchema
             code: "custom",
             path: [key],
             message: `${key} is required when EMAIL_TRANSPORT is smtp`,
+          });
+        }
+      }
+    }
+    if (env.STORAGE_DRIVER === "s3") {
+      for (const key of [
+        "STORAGE_ENDPOINT",
+        "STORAGE_BUCKET",
+        "STORAGE_ACCESS_KEY",
+        "STORAGE_SECRET_KEY",
+      ] as const) {
+        if (!env[key]) {
+          context.addIssue({
+            code: "custom",
+            path: [key],
+            message: `${key} is required when STORAGE_DRIVER is s3`,
           });
         }
       }

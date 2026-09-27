@@ -1,6 +1,7 @@
 import { afterAll, beforeEach } from "vitest";
 import { db } from "@/lib/db";
 import { memoryOutbox } from "@/lib/email";
+import { rawDb } from "../integration/raw-db";
 
 // Every table, children first. Kept explicit so a new table is a conscious addition.
 const TABLES = [
@@ -25,5 +26,5 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await db.$disconnect();
+  await Promise.all([db.$disconnect(), rawDb.$disconnect()]);
 });

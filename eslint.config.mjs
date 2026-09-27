@@ -35,6 +35,21 @@ export default defineConfig([
     },
   },
   {
+    // Tenant isolation: deliberate cross-company queries live only in repositories, where they are reviewable.
+    files: ["src/**"],
+    ignores: ["src/server/repositories/**", "src/lib/db/**"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "CallExpression[callee.name='crossTenant']",
+          message:
+            "crossTenant() is only allowed in src/server/repositories (see docs/database.md → Tenancy).",
+        },
+      ],
+    },
+  },
+  {
     // Rule 9: UI must not reach the database directly — go through server actions/services.
     files: ["src/components/**", "src/features/**"],
     rules: {

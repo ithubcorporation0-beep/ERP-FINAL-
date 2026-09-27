@@ -22,6 +22,7 @@ export const sessionRepository = {
         expiresAt: true,
         absoluteExpiresAt: true,
         lastUsedAt: true,
+        activeCompanyId: true,
         user: { select: { id: true, name: true, email: true, status: true, emailVerifiedAt: true } },
       },
     });
@@ -33,6 +34,11 @@ export const sessionRepository = {
       data: { lastUsedAt: new Date(), expiresAt },
       select: { id: true },
     });
+  },
+
+  /** Remembers the company the user switched to — only for their own session. */
+  setActiveCompany(userId: string, id: string, companyId: string) {
+    return db.session.updateMany({ where: { id, userId }, data: { activeCompanyId: companyId } });
   },
 
   listActive(userId: string, now = new Date()) {

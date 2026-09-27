@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { db } from "@/lib/db";
+import { rawDb } from "./raw-db";
 import { ConflictError, toAppError } from "@/lib/errors";
 import { companyRepository } from "@/server/repositories/company.repository";
 import { createCompanyWithOwner } from "./helpers";
@@ -19,7 +19,7 @@ describe("database-level guarantees", () => {
     const companyB = await createCompanyWithOwner("South");
 
     const error = await thrown(
-      db.membership.create({
+      rawDb.membership.create({
         data: { companyId: companyA.companyId, userId: companyB.userId, roleId: companyB.roleId },
       }),
     );
@@ -29,10 +29,10 @@ describe("database-level guarantees", () => {
   it("rejects a role permission that points at another company's role", async () => {
     const companyA = await createCompanyWithOwner("East");
     const companyB = await createCompanyWithOwner("West");
-    const permission = await db.permission.findFirstOrThrow();
+    const permission = await rawDb.permission.findFirstOrThrow();
 
     const error = await thrown(
-      db.rolePermission.create({
+      rawDb.rolePermission.create({
         data: { companyId: companyA.companyId, roleId: companyB.roleId, permissionId: permission.id },
       }),
     );
@@ -47,8 +47,8 @@ describe("database-level guarantees", () => {
 
   it("prevents hard-deleting a company that has audit history", async () => {
     const ctx = await createCompanyWithOwner("Archive Me");
-    const error = await thrown(db.company.delete({ where: { id: ctx.companyId } }));
+    const error = await thrown(rawDb.company.delete({ where: { id: ctx.companyId } }));
     expect(toAppError(error)).toBeInstanceOf(ConflictError);
-    expect(await db.company.count({ where: { id: ctx.companyId } })).toBe(1);
+    expect(await rawDb.company.count({ where: { id: ctx.companyId } })).toBe(1);
   });
 });

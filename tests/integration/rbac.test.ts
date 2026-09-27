@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { db } from "@/lib/db";
+import { rawDb } from "./raw-db";
 import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import { PERMISSION_KEYS } from "@/lib/permissions";
 import { can } from "@/lib/tenant";
@@ -17,7 +17,7 @@ async function roleId(companyId: string, name: string) {
 }
 
 async function membershipOf(companyId: string, userId: string) {
-  return db.membership.findUniqueOrThrow({ where: { companyId_userId: { companyId, userId } } });
+  return rawDb.membership.findUniqueOrThrow({ where: { companyId_userId: { companyId, userId } } });
 }
 
 describe("role permissions are resolved from the database", () => {
@@ -168,7 +168,7 @@ describe("safety rails", () => {
 
     await memberService.setSuspended(owner, membership.id, true);
     await expect(contextFor(employee.userId, owner.companyId)).rejects.toThrow("No access");
-    const actions = await db.auditLog.findMany({
+    const actions = await rawDb.auditLog.findMany({
       where: { entityId: membership.id },
       select: { action: true },
     });

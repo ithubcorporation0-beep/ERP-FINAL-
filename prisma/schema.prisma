@@ -49,6 +49,10 @@ model Company {
   locale               String        @default("en-US")
   /// 1 = January.
   fiscalYearStartMonth Int           @default(1) @map("fiscal_year_start_month") @db.SmallInt
+  /// Storage key of the logo image (see src/lib/storage). Null = no logo.
+  logoKey              String?       @map("logo_key")
+  logoContentType      String?       @map("logo_content_type")
+  logoUpdatedAt        DateTime?     @map("logo_updated_at") @db.Timestamptz(3)
   createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt            DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
   createdById          String?       @map("created_by") @db.Uuid
@@ -65,6 +69,7 @@ model Company {
   customers       Customer[]
   notifications   Notification[]
   authTokens      AuthToken[]
+  sessions        Session[]
 
   @@map("companies")
 }
@@ -138,10 +143,13 @@ model Session {
   userAgent         String?  @map("user_agent")
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   lastUsedAt        DateTime @default(now()) @map("last_used_at") @db.Timestamptz(3)
+  /// The company the user is working in (company switcher). Only honoured while the membership is ACTIVE.
+  activeCompanyId   String?  @map("active_company_id") @db.Uuid
   /// Hard limit: the session can be extended by activity, but never beyond this.
   absoluteExpiresAt DateTime @default(dbgenerated("(now() + '30 days'::interval)")) @map("absolute_expires_at") @db.Timestamptz(3)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeCompany Company? @relation(fields: [activeCompanyId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([expiresAt])

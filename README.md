@@ -3,7 +3,7 @@
 A multi-company ERP (CRM, sales, finance, HR, payroll, projects, inventory, reports) built with
 **Next.js 16, TypeScript, Tailwind CSS, shadcn/ui, Prisma 7 and PostgreSQL**.
 
-> **Status:** Phase 03 — authentication and role-based access control. ERP modules are built phase by phase; see
+> **Status:** Phase 04 — multi-tenant company isolation. ERP modules are built phase by phase; see
 > [MASTER-ERP-BUILD-PLAN.md](MASTER-ERP-BUILD-PLAN.md).
 
 ## Prerequisites

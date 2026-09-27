@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isCountryCode, isCurrencyCode, isLocale, isTimeZone } from "@/lib/intl";
 
 /** Route/record ids are UUIDs; validating first turns bad ids into a 404 instead of a database error. */
 export const idSchema = z.uuid("Invalid id.");
@@ -95,6 +96,38 @@ export const roleSchema = z.object({
   permissions: z.array(z.string()).max(500),
 });
 
+/** Company profile, as edited on the Settings page. Codes are validated against the ISO/IANA lists. */
+export const companyProfileSchema = z.object({
+  name: z.string().trim().min(2, "Enter the company name.").max(120),
+  legalName: z.string().trim().max(200),
+  taxId: z.string().trim().max(50),
+  email: z.union([z.literal(""), z.email("Enter a valid email address.").toLowerCase()]),
+  phone: z
+    .string()
+    .trim()
+    .max(30)
+    .regex(/^[+\d\s().-]*$/, "Use digits, spaces and + ( ) - only."),
+  address: z.string().trim().max(500),
+  country: z.union([z.literal(""), z.string().refine(isCountryCode, "Choose a country.")]),
+  baseCurrency: z.string().refine(isCurrencyCode, "Choose a currency."),
+  timezone: z.string().refine(isTimeZone, "Choose a time zone."),
+  locale: z.string().refine(isLocale, "Choose a language and region."),
+  fiscalYearStartMonth: z.number().int().min(1).max(12),
+});
+
+export const preferencesSchema = z.object({
+  dateFormat: z.enum(["yyyy-MM-dd", "dd/MM/yyyy", "MM/dd/yyyy"]),
+  weekStartsOn: z.number().int().min(0).max(6),
+  invoiceNumberPrefix: z
+    .string()
+    .trim()
+    .min(1)
+    .max(10)
+    .regex(/^[A-Z0-9-]+$/, "Use capital letters, digits and dashes only."),
+});
+
+export type CompanyProfileInput = z.infer<typeof companyProfileSchema>;
+export type PreferencesInput = z.infer<typeof preferencesSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
 export type CustomerInput = z.infer<typeof customerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

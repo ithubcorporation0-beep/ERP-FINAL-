@@ -21,3 +21,7 @@ npm-debug.log*
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Local file storage (STORAGE_DRIVER=local)
+/.storage/
+/.storage-test/

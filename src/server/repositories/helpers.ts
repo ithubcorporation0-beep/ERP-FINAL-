@@ -1,4 +1,3 @@
-import type { Prisma } from "@/generated/prisma/client";
 import type { Paginated } from "@/types";
 
 /**
@@ -10,7 +9,7 @@ import type { Paginated } from "@/types";
  */
 
 /** Either the shared client (`db`) or a transaction client from `db.$transaction`. */
-export type DbClient = Prisma.TransactionClient;
+export type { DbClient } from "@/lib/db";
 
 /** The user performing a write; `null` for system actions (e.g. the seed). */
 export type ActorId = string | null;

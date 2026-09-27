@@ -16,7 +16,7 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 | 01  | `feat(phase-01): establish ERP UI and UX design system`           | ✅     |
 | 02  | `feat(phase-02): establish database and backend foundation`       | ✅     |
 | 03  | `feat(phase-03): implement authentication and RBAC`               | ✅     |
-| 04  | `feat(phase-04): implement multi-tenant company foundation`       | 🟡     |
+| 04  | `feat(phase-04): implement multi-tenant company isolation`        | ✅     |
 | 05  | `feat(phase-05): implement dashboard`                             | ⬜     |
 | 06  | `feat(phase-06): implement CRM`                                   | 🟡     |
 | 07  | `feat(phase-07): implement sales`                                 | ⬜     |
@@ -86,12 +86,16 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
   (permission matrix, custom roles, duplicate, delete) with privilege-escalation guard
 - ✅ Tests: integration (auth + RBAC), e2e (protected pages, forbidden actions, role permissions)
 
-## Phase 04 — Multi-tenant company foundation
+## Phase 04 — Multi-tenant company isolation
 
-- ✅ `company_id` on all tenant data (with composite FKs), `requireTenant` (done in phase 02)
-- ⬜ Company switcher, company settings (currency, timezone)
-- ⬜ Invite users, assign roles, manage memberships
-- 🟡 Tenant-isolation tests (customers + constraints done in phase 02; extend per module)
+- ✅ Company context: tenant resolver (session-stored active company, validated per request), company switcher
+- ✅ Tenant-aware database access: tenant guard rejects unscoped queries on company-owned tables; `crossTenant()` for
+  reviewed exceptions (repositories only, enforced by ESLint)
+- ✅ Tenant-aware authorization: permissions of the role in the _current_ company; company never taken from input
+- ✅ Company profile and preferences (Settings page; read-only without `settings:manage`)
+- ✅ Logo upload architecture: storage drivers (local, S3-compatible), per-company keys, byte-level image checks
+- ✅ Tests: Company A cannot read / update / delete Company B data (services, repositories, API via browser),
+  tenant guard, company switching, logo isolation
 
 ## Phase 05 — Dashboard
 

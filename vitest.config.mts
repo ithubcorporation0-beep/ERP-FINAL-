@@ -52,6 +52,9 @@ export default defineConfig({
                   // Emails are captured in memory so tests can follow the links they contain.
                   EMAIL_TRANSPORT: "memory",
                   AUTH_ALLOW_REGISTRATION: "true",
+                  // Uploaded files go to a throwaway folder.
+                  STORAGE_DRIVER: "local",
+                  STORAGE_LOCAL_DIR: ".storage-test",
                   APP_URL: "http://localhost:3000",
                 },
                 globalSetup: ["tests/setup/integration-global.ts"],

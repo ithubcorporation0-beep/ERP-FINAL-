@@ -1,8 +1,8 @@
 import { cache } from "react";
-import { getCurrentUser, type SessionUser } from "@/lib/auth/session";
+import { getCurrentSession, getCurrentUser, type SessionUser } from "@/lib/auth/session";
 import { ForbiddenError, UnauthenticatedError } from "@/lib/errors";
 import { PERMISSION_KEYS, hasPermission, isPermissionKey, type PermissionKey } from "@/lib/permissions";
-import { membershipRepository } from "@/server/repositories/membership.repository";
+import { companyContextService } from "@/server/services/company-context.service";
 
 /** Who is acting, in which company, with which permissions. Passed to every service call. */
 export interface TenantContext {
@@ -20,10 +20,19 @@ export async function requireUser(): Promise<SessionUser> {
   return user;
 }
 
-const resolveTenant = cache(async (companyId: string | undefined): Promise<TenantContext> => {
-  const user = await requireUser();
-  const access = await membershipRepository.findAccess(user.id, companyId);
-  if (!access) throw new ForbiddenError("You don't have access to this company.");
+/**
+ * The current tenant (company) resolver — the ONLY way a company is chosen for a request:
+ * 1. the company selected with the company switcher (stored on the session), if the user still has an ACTIVE
+ *    membership there and the company is active;
+ * 2. otherwise the user's oldest active membership.
+ * A company id sent by the browser is never trusted. Cached per request.
+ */
+const resolveTenant = cache(async (): Promise<TenantContext> => {
+  const session = await getCurrentSession();
+  if (!session) throw new UnauthenticatedError();
+  const user = session.user;
+  const access = await companyContextService.resolveAccess(user.id, session.activeCompanyId);
+  if (!access) throw new ForbiddenError("You don't have access to any company.");
   return {
     userId: user.id,
     companyId: access.companyId,
@@ -33,20 +42,14 @@ const resolveTenant = cache(async (companyId: string | undefined): Promise<Tenan
   };
 });
 
-/**
- * Resolves the signed-in user's company and permissions (server-side only, cached per request).
- * The company always comes from the user's active membership — never from the request.
- */
-export function requireTenant(companyId?: string): Promise<TenantContext> {
-  return resolveTenant(companyId);
+/** The signed-in user's current company and permissions (server-side only, cached per request). */
+export function requireTenant(): Promise<TenantContext> {
+  return resolveTenant();
 }
 
 /** `requireTenant` + a permission check. Use at the top of every route handler and server action. */
-export async function requirePermission(
-  permission: PermissionKey,
-  companyId?: string,
-): Promise<TenantContext> {
-  const ctx = await requireTenant(companyId);
+export async function requirePermission(permission: PermissionKey): Promise<TenantContext> {
+  const ctx = await requireTenant();
   authorize(ctx, permission);
   return ctx;
 }

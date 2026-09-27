@@ -11,14 +11,16 @@
 Set every variable from `.env.example` in your hosting provider. The build **fails on purpose** if a
 required variable is missing or malformed, and prints which one — values are never printed.
 
-| Variable                                                                            | Required        | Notes                                                                                          |
-| ----------------------------------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                                                      | yes             | `postgresql://…` connection string                                                             |
-| `APP_URL`                                                                           | yes\*           | Public URL, e.g. `https://erp.example.com` (\*defaults to localhost)                           |
-| `EMAIL_TRANSPORT`                                                                   | no              | `smtp` (default in production) or `console` (prints emails with links — local/CI only)         |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SECURE`, `EMAIL_FROM` | yes with `smtp` | Reset, verification and invitation emails; the app refuses to start in production without them |
-| `AUTH_ALLOW_REGISTRATION`                                                           | no              | `true` lets anyone create a new company at `/register` (default: invitation only)              |
-| `STORAGE_*`                                                                         | later           | Needed once file uploads ship                                                                  |
+| Variable                                                                                           | Required        | Notes                                                                                                                        |
+| -------------------------------------------------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                                                     | yes             | `postgresql://…` connection string                                                                                           |
+| `APP_URL`                                                                                          | yes\*           | Public URL, e.g. `https://erp.example.com` (\*defaults to localhost)                                                         |
+| `EMAIL_TRANSPORT`                                                                                  | no              | `smtp` (default in production) or `console` (prints emails with links — local/CI only)                                       |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SECURE`, `EMAIL_FROM`                | yes with `smtp` | Reset, verification and invitation emails; the app refuses to start in production without them                               |
+| `AUTH_ALLOW_REGISTRATION`                                                                          | no              | `true` lets anyone create a new company at `/register` (default: invitation only)                                            |
+| `STORAGE_DRIVER`                                                                                   | no              | `s3` (default in production) or `local` (a folder; only for a single server with a persistent disk)                          |
+| `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`, `STORAGE_REGION` | yes with `s3`   | Any S3-compatible service (AWS S3, Cloudflare R2, MinIO). The bucket should be **private**; files are served through the app |
+| `STORAGE_LOCAL_DIR`                                                                                | no              | Folder for `local` storage (default `.storage`)                                                                              |
 
 `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` are only used by `npm run db:seed`, never by the running app.
 

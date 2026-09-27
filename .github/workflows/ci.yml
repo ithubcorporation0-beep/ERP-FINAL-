@@ -32,6 +32,8 @@ jobs:
       NEXT_TELEMETRY_DISABLED: 1
       # CI has no mail server: emails (with their links) are printed to the log.
       EMAIL_TRANSPORT: console
+      # CI has no object storage: uploads go to a local folder.
+      STORAGE_DRIVER: local
       # CI-only throwaway credentials for the seeded admin used by the e2e tests.
       SEED_ADMIN_EMAIL: e2e-admin@example.com
       SEED_ADMIN_PASSWORD: ci-only-password-123

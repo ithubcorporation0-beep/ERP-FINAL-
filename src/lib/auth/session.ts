@@ -17,6 +17,8 @@ export interface SessionUser {
 
 export interface CurrentSession {
   sessionId: string;
+  /** Company chosen with the company switcher (validated against memberships on every request). */
+  activeCompanyId: string | null;
   user: SessionUser;
 }
 
@@ -67,7 +69,11 @@ export const getCurrentSession = cache(async (): Promise<CurrentSession | null> 
   }
 
   const { id, name, email, emailVerifiedAt } = session.user;
-  return { sessionId: session.id, user: { id, name, email, emailVerified: emailVerifiedAt !== null } };
+  return {
+    sessionId: session.id,
+    activeCompanyId: session.activeCompanyId,
+    user: { id, name, email, emailVerified: emailVerifiedAt !== null },
+  };
 });
 
 export async function getCurrentUser(): Promise<SessionUser | null> {

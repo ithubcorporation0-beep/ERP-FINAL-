@@ -38,13 +38,16 @@ src/
     services/            Business rules, transactions, audit logging
     repositories/        Database queries (Prisma), always scoped by companyId; helpers.ts = conventions
   lib/
+    intl.ts              Country / currency / time-zone / locale lists (UI + validation)
     api.ts               handle(): route-handler wrapper → consistent JSON errors
     action.ts            runAction(): server-action wrapper → ActionResult
     errors.ts            AppError family + toAppError() (maps Zod and database errors)
     logger.ts            Structured logger with secret redaction
     auth/                Sessions, passwords, tokens, session policy, authorizePage(), public routes
+    storage/             File storage drivers (local, S3-compatible), keys, image checks
     email/               sendEmail() (smtp | console | memory transports) + templates
-    db/ env/             Prisma client · validated environment
+    db/                  Prisma client with the tenant guard; crossTenant()
+    env/                 Validated environment
     permissions/         Permission catalogue, default roles, hasPermission()
     settings/            Settings registry (keys, schemas, defaults)
     tenant/              requireTenant() / requirePermission() → TenantContext
@@ -81,6 +84,49 @@ Authentication is a service too (`auth.service.ts`): the login form's server act
 The full rule set every contributor and AI agent must follow is in [`AGENTS.md`](../AGENTS.md).
 Several of those rules are enforced automatically by ESLint (no `any`, no `@ts-ignore`, no empty
 `catch`, no database access from UI).
+
+## Multi-tenancy (company isolation)
+
+IT Hub ERP is one application and one database shared by many **companies** (tenants). A company must never
+see or change another company's data. Isolation is enforced **on the server, in five independent layers** — the
+UI only reflects what the server allows:
+
+| #   | Layer                    | What it guarantees                                                                                                                                                                                                                                                                   | Where                                                    |
+| --- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------- |
+| 1   | **Tenant resolver**      | The company for a request comes from the signed-in user's **active membership** (the company chosen in the switcher, else their oldest). A company id sent by the browser is never trusted.                                                                                          | `companyContextService.resolveAccess`, `requireTenant()` |
+| 2   | **Authorization**        | Every page, action and API route checks a permission of _that company's_ role.                                                                                                                                                                                                       | `authorizePage`, `requirePermission`, `authorize`        |
+| 3   | **Scoped queries**       | Every repository function for company data takes `companyId` first and filters by it — also for updates and deletes (`updateMany({ where: { id, companyId } })`), so a guessed id of another company matches nothing.                                                                | `src/server/repositories`                                |
+| 4   | **Tenant guard**         | The database client **rejects** any query on a company-owned table that isn't scoped by `companyId` (reads, updates, deletes, inserts, upserts). A forgotten filter fails loudly instead of leaking. Deliberate cross-company queries must be wrapped in `crossTenant("reason", …)`. | `src/lib/db/tenant-guard.ts`                             |
+| 5   | **Database constraints** | `company_id` on every tenant table; composite foreign keys stop a row from pointing at another company's parent.                                                                                                                                                                     | `prisma/schema.prisma`                                   |
+
+Files follow the same rule: every stored file lives under `companies/<companyId>/…`, and file endpoints take the
+company from the session (e.g. `GET /api/company/logo` has no id in the URL).
+
+### Company context
+
+- `TenantContext` = `{ userId, companyId, roleId, roleName, permissions }`, resolved once per request (cached).
+- **Company switcher** (header; mobile menu): lists the user's active memberships. Switching calls
+  `switchCompanyAction` → `companyContextService.switchCompany`, which requires an ACTIVE membership in an active
+  company, stores the choice on the **session** (`sessions.active_company_id`, per device) and audits `company.switch`.
+- If the chosen company becomes unavailable (membership suspended/removed, company archived), the resolver falls back
+  to the user's oldest active company; with none left the user sees "No company access".
+
+### Rules for new code
+
+1. Company-owned table? Add it to `TENANT_MODELS` in `src/lib/db/tenant-guard.ts`, give it `company_id`
+   (+ composite FKs for children) and a repository whose functions take `companyId` first.
+2. Services get `ctx` from `requireTenant()`/`requirePermission()` — never a company id from input.
+3. Need data across companies (rare: e.g. "my companies", platform maintenance)? Use `crossTenant("why", () => …)`.
+4. Add an isolation test to `tests/integration/tenant-isolation.test.ts` (read, update and delete from another company).
+
+### Uploads (company logo)
+
+`src/lib/storage` defines a small `StorageDriver` (`put` / `get` / `delete`) with two drivers: **local** (a folder,
+for development and single-server installs) and **s3** (any S3-compatible service — AWS S3, Cloudflare R2, MinIO —
+via signed requests). Keys are generated by the server (`companies/<companyId>/logo/<uuid>.png`) and validated
+against path traversal. Logos: PNG, JPEG or WebP (SVG is refused — it can contain scripts), max 1 MB, type detected
+from the file's bytes. The database stores the key and content type; `GET /api/company/logo` streams the current
+company's logo with `nosniff` and a restrictive content-security policy.
 
 ## Backend conventions
 

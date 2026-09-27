@@ -1,5 +1,5 @@
 import type { MembershipStatus, Prisma } from "@/generated/prisma/client";
-import { db } from "@/lib/db";
+import { crossTenant, db } from "@/lib/db";
 import { SUPER_ADMIN_ROLE } from "@/lib/permissions";
 import {
   createdBy,
@@ -35,25 +35,28 @@ export const membershipRepository = {
    * permission keys. Without `companyId`, returns the user's first (oldest) company.
    */
   async findAccess(userId: string, companyId?: string, client: DbClient = db): Promise<CompanyAccess | null> {
-    const membership = await client.membership.findFirst({
-      where: {
-        userId,
-        status: "ACTIVE",
-        ...(companyId ? { companyId } : {}),
-        company: { status: "ACTIVE", deletedAt: null },
-      },
-      orderBy: { createdAt: "asc" },
-      select: {
-        companyId: true,
-        role: {
-          select: {
-            id: true,
-            name: true,
-            rolePermissions: { select: { permission: { select: { key: true } } } },
+    const query = () =>
+      client.membership.findFirst({
+        where: {
+          userId,
+          status: "ACTIVE",
+          ...(companyId ? { companyId } : {}),
+          company: { status: "ACTIVE", deletedAt: null },
+        },
+        orderBy: { createdAt: "asc" },
+        select: {
+          companyId: true,
+          role: {
+            select: {
+              id: true,
+              name: true,
+              rolePermissions: { select: { permission: { select: { key: true } } } },
+            },
           },
         },
-      },
-    });
+      });
+    // Without a company, this looks across the user's own memberships to pick their default company.
+    const membership = companyId ? await query() : await crossTenant("user's default company", query);
     if (!membership) return null;
     return {
       companyId: membership.companyId,
@@ -136,7 +139,23 @@ export const membershipRepository = {
 
   /** Activates a user's INVITED memberships (all companies that invited them). */
   activateInvited(userId: string, client: DbClient = db) {
-    return client.membership.updateMany({ where: { userId, status: "INVITED" }, data: { status: "ACTIVE" } });
+    return crossTenant("activate the user's own invitations in every company", () =>
+      client.membership.updateMany({ where: { userId, status: "INVITED" }, data: { status: "ACTIVE" } }),
+    );
+  },
+
+  /** Companies the user can switch to (active membership in an active company), oldest first. */
+  listCompaniesForUser(userId: string, client: DbClient = db) {
+    return crossTenant("list the user's own companies for the company switcher", () =>
+      client.membership.findMany({
+        where: { userId, status: "ACTIVE", company: { status: "ACTIVE", deletedAt: null } },
+        orderBy: { createdAt: "asc" },
+        select: {
+          role: { select: { name: true } },
+          company: { select: { id: true, name: true, logoUpdatedAt: true } },
+        },
+      }),
+    );
   },
 
   delete(companyId: string, id: string, client: DbClient = db) {

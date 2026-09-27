@@ -115,6 +115,11 @@ assertCanGrant(ctx, role.permissions);                  // privilege-escalation 
 - Every change is written to the audit log (`user.invite`, `user.role_change`, `user.suspend`, `user.reactivate`,
   `user.remove`, `role.create`, `role.update`, `role.delete`, `auth.*`).
 
+## Company settings
+
+`/settings` needs `settings:view` (Super Admin, Admin); changing the company profile, logo or preferences needs
+`settings:manage` (Super Admin only by default). Admins see the page read-only.
+
 ## Adding a permission
 
 1. Add the key to `PERMISSION_KEYS` in `src/lib/permissions/index.ts` (and its module label if new).
