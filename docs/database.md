@@ -3,7 +3,7 @@
 PostgreSQL (15+, developed on 16) through **Prisma 7**. Schema: `prisma/schema.prisma`.
 Prisma settings (connection URL, migrations folder, seed command): `prisma.config.ts`.
 
-## What exists today (phases 02–07)
+## What exists today (phases 02–08)
 
 The **core platform** tables. ERP module tables (invoices, employees, stock, …) are added by the
 phase that builds each module, so every table is designed with its real requirements.
@@ -21,7 +21,10 @@ companies ──┬── memberships ── users ──┬── sessions
             ├── number_sequences (per-company counters: CUS-0001, LEAD-0001, QUO/SO/INV/PAY …)
             ├── quotations ── quotation_items   (a confirmed quotation is a sales order)
             ├── invoices ── invoice_items, payments
-            └── share_links (public, expiring links to one document's PDF)
+            ├── share_links (public, expiring links to one document's PDF)
+            ├── accounts (chart of accounts)
+            ├── journal_entries ── journal_lines → accounts   (double-entry ledger)
+            ├── expenses (employee → users, receipt in storage)
             └── notifications
 ```
 
@@ -46,6 +49,10 @@ companies ──┬── memberships ── users ──┬── sessions
 | `payments`                      | `company_id`                               | Money received against an invoice; voided (`voided_at`, reason, by) instead of deleted                                                                           |
 | `share_links`                   | `company_id`                               | Token hash, document type + id, expiry, revocation, last access                                                                                                  |
 | `number_sequences`              | `company_id`                               | Per-company counters for human-readable numbers, incremented atomically (`INSERT … ON CONFLICT … RETURNING`)                                                     |
+| `accounts`                      | `company_id`                               | Chart of accounts: code, name, type (asset, liability, equity, revenue, expense), `system_key` for accounts used by automatic postings, active flag              |
+| `journal_entries`               | `company_id`                               | Transactions (`number` = JE-0001): type, date, description, reference, `posting_key` (unique, idempotent automatic postings), source, `reversal_of_id`           |
+| `journal_lines`                 | `company_id`                               | One debit **or** credit (NUMERIC 18,2) on one account; CHECK one side; deferred trigger checks Σ debit = Σ credit per entry                                      |
+| `expenses`                      | `company_id`                               | Expenses (`number` = EXP-0001): category, amount, date, vendor, payment method, description, employee, approval status/decision, paid date, receipt; soft delete |
 | `notifications`                 | `company_id`                               | In-app notifications (the header bell)                                                                                                                           |
 
 ## Conventions
@@ -81,7 +88,7 @@ Not covered by the guard (review these by hand): raw SQL (`$queryRaw`, `$execute
 (they are reached through an already-scoped parent). Raw SQL is used only where Prisma can't express the query
 (today: `customerRepository.countCreatedByMonth`, grouping by month in the company's time zone, and
 `numberSequenceRepository.next`, an atomic upsert-and-increment; `invoiceRepository.lock` (`SELECT … FOR UPDATE`) and
-`sumIssuedByMonth`); it always filters
+`sumIssuedByMonth`; `journalRepository.monthlyByType`, ledger totals per month); it always filters
 `company_id = ${companyId}` explicitly, uses tagged-template parameters (never string concatenation), validates the
 rows with Zod, and has an isolation test. PostgreSQL row-level security can be added later as a sixth
 layer (see ADR-024).
@@ -176,3 +183,5 @@ Integration tests (`tests/integration`) run against **PostgreSQL, not mocks**:
 | `20260927120000_crm_customers_and_leads`     | Phase 06: CRM enums; new customer columns; `customer_documents`, `customer_communications`, `leads`, `number_sequences`. **Data migration:** existing customers are numbered 1, 2, 3… per company (oldest first) and each company's `customer` sequence continues after them.                                     |
 | `20260927160000_sales_invoices_and_payments` | Phase 07: quotations (+ items), invoices (+ items), payments, share links; `leads (id, company_id)` unique for composite keys.                                                                                                                                                                                    |
 | `20260927160100_sales_money_checks`          | Phase 07: CHECK constraints — payment amount > 0, 0 ≤ amount paid ≤ total, totals ≥ 0, due/expiry ≥ document date, line quantity > 0, percentages 0–100.                                                                                                                                                          |
+| `20260928100000_expenses_and_accounting`     | Phase 08: accounting and expense enums; `accounts`, `journal_entries`, `journal_lines`, `expenses`.                                                                                                                                                                                                               |
+| `20260928100100_ledger_integrity`            | Phase 08: CHECK `journal_lines_one_side`, `expenses_amount_positive`; function `check_journal_entry_balanced()` and deferred constraint trigger `journal_lines_balanced`. Run `npm run db:seed` afterwards to create default accounts and post existing invoices/payments.                                        |

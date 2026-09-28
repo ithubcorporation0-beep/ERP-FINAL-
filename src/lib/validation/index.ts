@@ -13,6 +13,14 @@ import {
   PAYMENT_METHODS,
   QUOTATION_DISPLAY_STATUSES,
 } from "@/config/sales";
+import {
+  ACCOUNT_TYPES,
+  EXPENSE_CATEGORIES,
+  EXPENSE_PAYMENT_METHODS,
+  EXPENSE_STATUSES,
+  PAID_METHODS,
+  TRANSACTION_TYPES,
+} from "@/config/accounting";
 import { DATE_RANGE_PRESETS, DEFAULT_DATE_RANGE } from "@/lib/date-range";
 import { isCountryCode, isCurrencyCode, isLocale, isTimeZone } from "@/lib/intl";
 
@@ -236,6 +244,89 @@ export const sendDocumentSchema = z.object({
   message: optionalText(2000),
 });
 
+// ─── Expenses and accounting ───
+
+const positiveMoney = decimalText(2, "Enter an amount like 250 or 250.75.").refine(
+  (value) => /[1-9]/.test(value),
+  "Must be more than 0.",
+);
+/** A money amount that may be empty/zero (one side of a journal line). */
+const optionalMoneyText = z.union([z.literal(""), decimalText(2, "Enter an amount like 250 or 250.75.")]);
+
+export const expenseSchema = z.object({
+  category: z.enum(EXPENSE_CATEGORIES),
+  amount: positiveMoney,
+  expenseDate: isoDate,
+  vendor: optionalText(200),
+  paymentMethod: z.enum(EXPENSE_PAYMENT_METHODS),
+  description: z.string().trim().min(1, "Describe the expense.").max(2000),
+  /** The member who incurred it; "" = yourself. Only approvers may choose someone else. */
+  employeeId: z.union([z.literal(""), idSchema]).optional(),
+});
+
+export const expenseListQuerySchema = paginationSchema.extend({
+  status: listFilter(EXPENSE_STATUSES),
+  category: listFilter(EXPENSE_CATEGORIES),
+  mine: z.enum(["1"]).optional().catch(undefined),
+});
+
+export const expenseDecisionSchema = z.object({
+  id: idSchema,
+  note: optionalText(1000),
+});
+
+export const expenseRejectSchema = z.object({
+  id: idSchema,
+  note: z.string().trim().min(3, "Say why the expense is rejected.").max(1000),
+});
+
+export const expensePaySchema = z.object({
+  id: idSchema,
+  method: z.enum(PAID_METHODS),
+  paidAt: isoDate,
+});
+
+export const accountSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .min(1, "Enter an account code.")
+    .max(20)
+    .regex(/^[A-Za-z0-9.-]+$/, "Use letters, digits, dots and dashes."),
+  name: z.string().trim().min(2, "Enter a name.").max(120),
+  type: z.enum(ACCOUNT_TYPES),
+  description: optionalText(500),
+  isActive: z.boolean().optional(),
+});
+
+export const journalLineSchema = z.object({
+  accountId: idSchema,
+  debit: optionalMoneyText,
+  credit: optionalMoneyText,
+  description: optionalText(300),
+});
+
+/** A manual transaction. Balance (Σ debit = Σ credit) is checked by the service with exact arithmetic. */
+export const journalEntrySchema = z.object({
+  type: z.enum(TRANSACTION_TYPES),
+  entryDate: isoDate,
+  description: z.string().trim().min(1, "Describe the transaction.").max(500),
+  reference: optionalText(120),
+  lines: z.array(journalLineSchema).min(2, "A transaction needs at least two lines.").max(100),
+});
+
+export const journalListQuerySchema = paginationSchema.extend({
+  type: listFilter(TRANSACTION_TYPES),
+  accountId: idSchema.optional().catch(undefined),
+  range: z.enum(DATE_RANGE_PRESETS).optional().catch(undefined),
+});
+
+/** Financial report query: a period preset, and for the balance sheet an "as of" date. */
+export const reportQuerySchema = z.object({
+  range: z.enum(DATE_RANGE_PRESETS).catch("this-fiscal-year"),
+  asOf: isoDate.optional().catch(undefined),
+});
+
 export const loginSchema = z.object({
   email: z.email("Enter a valid email address.").toLowerCase(),
   password: z.string().min(1, "Enter your password.").max(200),
@@ -364,6 +455,12 @@ export type InvoiceListQuery = z.infer<typeof invoiceListQuerySchema>;
 export type PaymentInput = z.infer<typeof paymentSchema>;
 export type PaymentListQuery = z.infer<typeof paymentListQuerySchema>;
 export type SendDocumentInput = z.infer<typeof sendDocumentSchema>;
+export type ExpenseInput = z.infer<typeof expenseSchema>;
+export type ExpenseListQuery = z.infer<typeof expenseListQuerySchema>;
+export type AccountInput = z.infer<typeof accountSchema>;
+export type JournalEntryInput = z.infer<typeof journalEntrySchema>;
+export type JournalListQuery = z.infer<typeof journalListQuerySchema>;
+export type ReportQuery = z.infer<typeof reportQuerySchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

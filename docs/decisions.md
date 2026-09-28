@@ -286,3 +286,27 @@ replaced by "?" instead of failing — embedding a Unicode font (with Arabic sha
 same view model feeds the screen, the print page and the PDF. For WhatsApp, the app opens `wa.me` with a message
 that contains a share link: a random 256-bit token (only its hash is stored), 30-day expiry, revocable, limited to
 one document. A WhatsApp Business API integration can later send the same message from the server.
+
+## ADR-035: Double-entry ledger enforced by the database (phase 08)
+
+Accounting is a real double-entry journal (`journal_entries` + `journal_lines`) rather than per-module totals, so
+the P&L, balance sheet and cash flow all read one source. Balance (Σ debit = Σ credit) is checked in the service
+with exact BigInt arithmetic, and again by the database: a CHECK constraint (one side per line) and a deferred
+constraint trigger that runs at commit, so even raw SQL or a future bug can't store an unbalanced entry. Balances
+are computed from the lines when read (no stored running totals to drift).
+
+## ADR-036: Immutable postings with posting keys and reversals (phase 08)
+
+Posted entries are never edited or deleted; corrections are reversing entries that point at the original.
+Automatic postings are written in the same transaction as their source change and carry a unique
+`(company_id, posting_key)` such as `invoice:<id>:issue`, which makes them idempotent: retries can't double-post,
+and the seed can back-fill phase-07 invoices and payments safely. Automatic postings are corrected only from their
+source (cancel the invoice, void the payment), keeping the sub-ledgers and the ledger in agreement; AR/AP reports
+show the reconciliation instead of assuming it.
+
+## ADR-037: Expense approval with owner-scoped visibility (phase 08)
+
+Expenses post to the ledger only when approved (accrual at the expense date; "Not paid yet" goes to Accounts
+Payable). Visibility is a record-level rule in the service: approvers and accountants see all expenses, everyone
+else only their own, enforced in the repository query so lists, detail pages and the API agree. Receipts reuse the
+storage layer with company-prefixed keys.

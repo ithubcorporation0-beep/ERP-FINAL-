@@ -151,6 +151,26 @@ convenience only.
 `quotations:*` is new in phase 07 — run `npm run db:seed` after deploying so existing companies' built-in roles get
 it. Share links (`/api/share/<token>`) are the only public sales URL: the token grants read access to one PDF.
 
+## Finance
+
+| Action                                                         | Permission                                               | Built-in roles (besides Super Admin / Admin) |
+| -------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------- |
+| See expenses (own only, see below) and submit your own         | `expenses:view` + `expenses:create`                      | Employee, Accountant                         |
+| See everyone's expenses                                        | `expenses:approve`, `expenses:edit` or `accounting:view` | Manager, Accountant                          |
+| Edit / delete anyone's pending or rejected expense             | `expenses:edit` / `expenses:delete`                      | Accountant                                   |
+| Approve (posts to the ledger) / reject (reason required)       | `expenses:approve` / `expenses:reject`                   | Manager, Accountant                          |
+| Mark an unpaid expense as paid (posts to the ledger)           | `accounting:create`                                      | Accountant                                   |
+| See accounts, transactions, account ledgers, financial reports | `accounting:view`                                        | Accountant                                   |
+| Add accounts / post manual transactions                        | `accounting:create`                                      | Accountant                                   |
+| Edit accounts                                                  | `accounting:edit`                                        | Accountant                                   |
+| Delete unused accounts / reverse manual transactions           | `accounting:delete`                                      | Accountant                                   |
+
+**Own expenses:** a user without `expenses:approve`, `expenses:edit` or `accounting:view` sees only expenses filed
+for or by themselves (lists, detail pages and the API — another person's expense is "not found"), can only file
+for themselves, and may edit or delete their own expense while it is pending or rejected (with
+`expenses:create`). Approved expenses can't be changed by anyone. The expense page's "Accounting" section is shown
+only with `accounting:view`.
+
 ## Dashboard widgets
 
 The dashboard needs `dashboard:view`; each widget additionally needs any one of its permissions in

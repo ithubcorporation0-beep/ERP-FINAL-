@@ -20,6 +20,7 @@ import type { DbClient } from "@/server/repositories/helpers";
 import { invoiceRepository, type InvoiceData } from "@/server/repositories/invoice.repository";
 import { numberSequenceRepository } from "@/server/repositories/number-sequence.repository";
 import { writeAuditLog } from "./audit.service";
+import { ledgerService } from "./ledger.service";
 import { companyService } from "./company.service";
 import { recordHistory, snapshotText } from "./record-history";
 import { assertActiveCustomer, presentDocument, priceItems, salesContext } from "./sales-shared";
@@ -214,6 +215,8 @@ export const invoiceService = {
       ) {
         throw new ConflictError("The invoice changed meanwhile. Reload and try again.");
       }
+      // Rule S1: an issued invoice is posted to the ledger.
+      await ledgerService.postInvoiceIssued(ctx.companyId, ctx.userId, invoice, tx);
       await writeAuditLog(
         ctx,
         {
@@ -301,6 +304,8 @@ export const invoiceService = {
       const data =
         invoice.status === "DRAFT" ? { status: "SENT" as const, sentAt: new Date() } : { sentAt: new Date() };
       await invoiceRepository.transition(ctx.companyId, input.id, [invoice.status], data, ctx.userId, tx);
+      if (invoice.status === "DRAFT")
+        await ledgerService.postInvoiceIssued(ctx.companyId, ctx.userId, invoice, tx);
       await writeAuditLog(
         ctx,
         {
@@ -332,6 +337,11 @@ export const invoiceService = {
         tx,
       );
       if (!moved) throw new ConflictError("The invoice changed meanwhile. Reload and try again.");
+      // Rule S2: an issued invoice's posting is reversed (a draft was never posted).
+      if (invoice.status !== "DRAFT") {
+        const { today } = await salesContext(ctx);
+        await ledgerService.postInvoiceCancelled(ctx.companyId, ctx.userId, invoice, today, tx);
+      }
       await writeAuditLog(
         ctx,
         {

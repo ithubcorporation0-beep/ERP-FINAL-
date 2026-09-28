@@ -2,7 +2,8 @@
  * Seed = system data only, never fake business data:
  *   1. syncs the permission catalogue (adds new keys, removes retired ones),
  *   2. creates (or updates) the first company, its built-in roles and its Super Admin account,
- *   3. refreshes the built-in roles of every company, so permission changes reach existing companies.
+ *   3. refreshes the built-in roles of every company, so permission changes reach existing companies,
+ *   4. gives every company its default chart of accounts and posts earlier invoices/payments to the ledger.
  * Idempotent — safe to run on every deploy. Run with `npm run db:seed`.
  */
 import "dotenv/config";
@@ -11,6 +12,7 @@ import { db } from "@/lib/db";
 import { slugify } from "@/lib/utils";
 import { accessService } from "@/server/services/access.service";
 import { companyService } from "@/server/services/company.service";
+import { ledgerService } from "@/server/services/ledger.service";
 
 const seedEnv = z.object({
   SEED_COMPANY_NAME: z.string().trim().min(2).default("IT Hub"),
@@ -33,6 +35,8 @@ async function main() {
   });
 
   const companies = await accessService.syncAllCompanies();
+  // Default chart of accounts for every company, and ledger postings for invoices/payments made before phase 08.
+  await ledgerService.syncAllCompanies();
 
   console.log(
     `Seed complete — built-in roles refreshed in ${companies} compan${companies === 1 ? "y" : "ies"}; ` +

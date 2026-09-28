@@ -77,6 +77,10 @@ model Company {
   invoiceItems           InvoiceItem[]
   payments               Payment[]
   shareLinks             ShareLink[]
+  accounts               Account[]
+  journalEntries         JournalEntry[]
+  journalLines           JournalLine[]
+  expenses               Expense[]
   notifications          Notification[]
   authTokens             AuthToken[]
   sessions               Session[]
@@ -150,6 +154,13 @@ model User {
   paymentsCreated               Payment[]               @relation("PaymentCreatedBy")
   paymentsVoided                Payment[]               @relation("PaymentVoidedBy")
   shareLinksCreated             ShareLink[]             @relation("ShareLinkCreatedBy")
+  accountsCreated               Account[]               @relation("AccountCreatedBy")
+  accountsUpdated               Account[]               @relation("AccountUpdatedBy")
+  journalEntriesCreated         JournalEntry[]          @relation("JournalEntryCreatedBy")
+  expensesIncurred              Expense[]               @relation("ExpenseEmployee")
+  expensesDecided               Expense[]               @relation("ExpenseDecidedBy")
+  expensesCreated               Expense[]               @relation("ExpenseCreatedBy")
+  expensesUpdated               Expense[]               @relation("ExpenseUpdatedBy")
   authTokensCreated             AuthToken[]             @relation("AuthTokenCreatedBy")
 
   @@map("users")
@@ -781,6 +792,192 @@ model ShareLink {
 
   @@index([companyId, documentType, documentId])
   @@map("share_links")
+}
+
+// ─── Expenses and accounting (phase 08) ──────────────────────
+// Double-entry ledger: every journal entry's debits equal its credits (checked by the service AND by a deferred
+// database trigger). Rules for automatic postings are documented in docs/accounting.md.
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+
+  @@map("account_type")
+}
+
+/// Chart of accounts, per company. System accounts (`system_key` set) are created automatically and used by
+/// automatic postings; they can be renamed but not deleted.
+model Account {
+  id          String      @id @default(uuid(7)) @db.Uuid
+  companyId   String      @map("company_id") @db.Uuid
+  code        String
+  name        String
+  type        AccountType
+  /// e.g. "cash", "receivable", "expense_rent". Null for accounts people create.
+  systemKey   String?     @map("system_key")
+  description String?
+  isActive    Boolean     @default(true) @map("is_active")
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById String?     @map("created_by") @db.Uuid
+  updatedById String?     @map("updated_by") @db.Uuid
+
+  company   Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdBy User?         @relation("AccountCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?         @relation("AccountUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  lines     JournalLine[]
+
+  @@unique([companyId, code])
+  @@unique([companyId, systemKey])
+  @@unique([id, companyId])
+  @@map("accounts")
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  PAYMENT
+  PURCHASE
+  SALES
+
+  @@map("transaction_type")
+}
+
+/// A transaction in the ledger. Posted entries are never edited or deleted: a mistake is corrected by a reversing
+/// entry (`reversal_of_id`).
+model JournalEntry {
+  id           String          @id @default(uuid(7)) @db.Uuid
+  companyId    String          @map("company_id") @db.Uuid
+  /// "JE-0001", per company.
+  number       Int
+  type         TransactionType
+  entryDate    DateTime        @map("entry_date") @db.Date
+  description  String
+  reference    String?
+  /// Makes automatic postings idempotent, e.g. "invoice:<id>:issue". Null for manual entries.
+  postingKey   String?         @map("posting_key")
+  /// What created it: INVOICE, PAYMENT, EXPENSE or MANUAL.
+  sourceType   String          @map("source_type")
+  sourceId     String?         @map("source_id") @db.Uuid
+  /// Set on the reversing entry: the entry it cancels.
+  reversalOfId String?         @map("reversal_of_id") @db.Uuid
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById  String?         @map("created_by") @db.Uuid
+
+  company    Company        @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdBy  User?          @relation("JournalEntryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  reversalOf JournalEntry?  @relation("JournalReversal", fields: [reversalOfId, companyId], references: [id, companyId], onDelete: Restrict)
+  reversals  JournalEntry[] @relation("JournalReversal")
+  lines      JournalLine[]
+
+  @@unique([companyId, number])
+  @@unique([companyId, postingKey])
+  @@unique([id, companyId])
+  @@index([companyId, entryDate])
+  @@index([companyId, sourceType, sourceId])
+  @@map("journal_entries")
+}
+
+/// One side of a journal entry: exactly one of debit / credit is positive (CHECK constraint).
+model JournalLine {
+  id          String  @id @default(uuid(7)) @db.Uuid
+  companyId   String  @map("company_id") @db.Uuid
+  entryId     String  @map("entry_id") @db.Uuid
+  accountId   String  @map("account_id") @db.Uuid
+  position    Int
+  debit       Decimal @default(0) @db.Decimal(18, 2)
+  credit      Decimal @default(0) @db.Decimal(18, 2)
+  description String?
+
+  company Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  entry   JournalEntry @relation(fields: [entryId, companyId], references: [id, companyId], onDelete: Cascade)
+  account Account      @relation(fields: [accountId, companyId], references: [id, companyId], onDelete: Restrict)
+
+  @@index([companyId, accountId])
+  @@index([companyId, entryId])
+  @@map("journal_lines")
+}
+
+enum ExpenseCategory {
+  RENT
+  UTILITIES
+  SALARIES
+  MARKETING
+  TRANSPORTATION
+  OFFICE_SUPPLIES
+  SOFTWARE
+  EQUIPMENT
+  OTHER
+
+  @@map("expense_category")
+}
+
+enum ExpensePaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD
+  ONLINE
+  OTHER
+  /// Not paid yet: owed to the vendor (accounts payable) until marked as paid.
+  UNPAID
+
+  @@map("expense_payment_method")
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("expense_status")
+}
+
+/// A business expense, submitted by (or for) an employee and approved before it reaches the ledger.
+model Expense {
+  id                 String                @id @default(uuid(7)) @db.Uuid
+  companyId          String                @map("company_id") @db.Uuid
+  /// "EXP-0001", per company.
+  number             Int
+  category           ExpenseCategory
+  amount             Decimal               @db.Decimal(18, 2)
+  currency           String                @db.Char(3)
+  expenseDate        DateTime              @map("expense_date") @db.Date
+  vendor             String?
+  paymentMethod      ExpensePaymentMethod  @map("payment_method")
+  description        String
+  /// The company member who incurred it (an employee record once HR ships).
+  employeeId         String?               @map("employee_id") @db.Uuid
+  status             ExpenseStatus         @default(PENDING)
+  decisionNote       String?               @map("decision_note")
+  decidedById        String?               @map("decided_by") @db.Uuid
+  decidedAt          DateTime?             @map("decided_at") @db.Timestamptz(3)
+  /// For UNPAID expenses: when and how the vendor was paid later.
+  paidAt             DateTime?             @map("paid_at") @db.Date
+  paidMethod         ExpensePaymentMethod? @map("paid_method")
+  receiptKey         String?               @unique @map("receipt_key")
+  receiptName        String?               @map("receipt_name")
+  receiptContentType String?               @map("receipt_content_type")
+  receiptSize        Int?                  @map("receipt_size")
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById        String?               @map("created_by") @db.Uuid
+  updatedById        String?               @map("updated_by") @db.Uuid
+  deletedAt          DateTime?             @map("deleted_at") @db.Timestamptz(3)
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  employee  User?   @relation("ExpenseEmployee", fields: [employeeId], references: [id], onDelete: SetNull)
+  decidedBy User?   @relation("ExpenseDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  createdBy User?   @relation("ExpenseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?   @relation("ExpenseUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, number])
+  @@index([companyId, deletedAt, status])
+  @@index([companyId, employeeId])
+  @@index([companyId, expenseDate])
+  @@map("expenses")
 }
 
 /// Per-company counters for human-readable numbers (customers, leads; invoices later). Incremented atomically.

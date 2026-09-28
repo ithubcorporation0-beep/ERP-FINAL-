@@ -10,9 +10,10 @@ import {
   type DashboardSource,
   type KpiId,
 } from "@/config/dashboard";
+import { EXPENSE_CATEGORY_LABELS, expenseCategoryLabel } from "@/config/accounting";
 import { formatRecordNumber } from "@/config/records";
 import { formatMoney } from "@/lib/format";
-import { money, subtractMoney } from "@/lib/money";
+import { addMoney, compareMoney, money, subtractMoney, sumMoney } from "@/lib/money";
 import { resolveDateRange, type DateRangePreset, type ResolvedDateRange } from "@/lib/date-range";
 import { NotFoundError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
@@ -20,6 +21,8 @@ import { hasAnyPermission, hasPermission, type PermissionKey } from "@/lib/permi
 import { authorize, type TenantContext } from "@/lib/tenant";
 import { companyRepository } from "@/server/repositories/company.repository";
 import { customerRepository } from "@/server/repositories/customer.repository";
+import { expenseRepository } from "@/server/repositories/expense.repository";
+import { journalRepository } from "@/server/repositories/journal.repository";
 import { invoiceRepository } from "@/server/repositories/invoice.repository";
 import { paymentRepository } from "@/server/repositories/payment.repository";
 
@@ -46,7 +49,8 @@ export interface KpiData {
 /** A month-by-month chart. `values` holds one number per series key. */
 export interface MonthlyChartData {
   series: Array<{ key: string; label: string; kind: "bar" | "line" }>;
-  rows: Array<{ month: string; label: string; values: Record<string, number> }>;
+  /** One row per month (key "YYYY-MM") or per category. */
+  rows: Array<{ key: string; label: string; values: Record<string, number> }>;
   /** False when every value is zero — the UI shows an empty state instead of a flat chart. */
   hasData: boolean;
 }
@@ -92,6 +96,22 @@ const kpiProviders: Partial<Record<KpiId, KpiProvider>> = {
     return { value: money(total ?? "0"), format: "currency" };
   },
 
+  /** Approved expenses dated in the range. */
+  async totalExpenses({ ctx, range }) {
+    const total = await expenseRepository.sumApproved(ctx.companyId, calendarBounds(range));
+    return { value: money(total ?? "0"), format: "currency" };
+  },
+
+  /** From the ledger: revenue − expense accounts for entries dated in the range (same as the P&L report). */
+  async netProfit({ ctx, range }) {
+    const rows = await journalRepository.monthlyByType(ctx.companyId, calendarBounds(range));
+    const totals = profitByMonth(rows);
+    return {
+      value: sumMoney([...totals.values()].map((month) => subtractMoney(month.revenue, month.expense))),
+      format: "currency",
+    };
+  },
+
   /** What customers owe right now on open invoices (not limited to the range). */
   async outstandingInvoices({ ctx }) {
     const { total, paid } = await invoiceRepository.sumOutstanding(ctx.companyId);
@@ -100,12 +120,51 @@ const kpiProviders: Partial<Record<KpiId, KpiProvider>> = {
 };
 
 const chartProviders: Partial<Record<ChartId, ChartProvider>> = {
+  /** Ledger revenue vs expenses per month (entry date). */
+  async revenueVsExpenses({ ctx, range, locale }) {
+    const totals = profitByMonth(await journalRepository.monthlyByType(ctx.companyId, calendarBounds(range)));
+    const rows = range.months.map((month) => {
+      const values = totals.get(month.key);
+      // Chart coordinates only — the exact amounts are in the reports.
+      return {
+        key: month.key,
+        label: monthLabel(month.year, month.month, locale),
+        values: { revenue: Number(values?.revenue ?? "0"), expenses: Number(values?.expense ?? "0") },
+      };
+    });
+    return {
+      series: [
+        { key: "revenue", label: "Revenue", kind: "bar" },
+        { key: "expenses", label: "Expenses", kind: "bar" },
+      ],
+      rows,
+      hasData: rows.some((row) => row.values.revenue !== 0 || row.values.expenses !== 0),
+    };
+  },
+
+  /** Approved expenses in the range by category, largest first. */
+  async expenseBreakdown({ ctx, range }) {
+    const rows = await expenseRepository.approvedBy(ctx.companyId, "category", calendarBounds(range));
+    const sorted = rows
+      .map((row) => ({ key: row.key ?? "OTHER", total: money(row.total) }))
+      .sort((a, b) => compareMoney(b.total, a.total));
+    return {
+      series: [{ key: "amount", label: "Approved expenses", kind: "bar" }],
+      rows: sorted.map((row) => ({
+        key: row.key,
+        label: expenseCategoryLabel(row.key),
+        values: { amount: Number(row.total) },
+      })),
+      hasData: sorted.length > 0,
+    };
+  },
+
   /** Issued invoice totals per month of the invoice date. */
   async monthlySales({ ctx, range, locale }) {
     const monthly = await invoiceRepository.sumIssuedByMonth(ctx.companyId, calendarBounds(range));
     const totals = new Map(monthly.map((row) => [row.month, money(row.total)]));
     const rows = range.months.map((month) => ({
-      month: month.key,
+      key: month.key,
       label: monthLabel(month.year, month.month, locale),
       // Chart coordinates only — exact amounts are in the tables and KPIs.
       values: { sales: Number(totals.get(month.key) ?? "0") },
@@ -128,7 +187,7 @@ const chartProviders: Partial<Record<ChartId, ChartProvider>> = {
       const count = added.get(month.key) ?? 0;
       total += count;
       return {
-        month: month.key,
+        key: month.key,
         label: monthLabel(month.year, month.month, locale),
         values: { added: count, total },
       };
@@ -145,6 +204,17 @@ const chartProviders: Partial<Record<ChartId, ChartProvider>> = {
 };
 
 const activityProviders: Partial<Record<ActivityId, ActivityProvider>> = {
+  async expenses({ ctx, locale }, limit) {
+    const expenses = await expenseRepository.listRecent(ctx.companyId, limit);
+    return expenses.map((expense) => ({
+      id: `expense:${expense.id}`,
+      source: "expenses",
+      title: `${formatRecordNumber("expense", expense.number)} · ${expense.vendor ?? EXPENSE_CATEGORY_LABELS[expense.category]}`,
+      detail: formatMoney(money(expense.amount), { locale, currency: expense.currency }) ?? undefined,
+      at: expense.createdAt.toISOString(),
+    }));
+  },
+
   async newInvoices({ ctx, locale }, limit) {
     const invoices = await invoiceRepository.listRecent(ctx.companyId, limit);
     return invoices.map((invoice) => ({
@@ -179,6 +249,20 @@ const activityProviders: Partial<Record<ActivityId, ActivityProvider>> = {
 };
 
 // ─── Helpers ───
+
+/** Revenue and expense per month from ledger rows (revenue = credit − debit, expense = debit − credit). */
+function profitByMonth(rows: ReadonlyArray<{ month: string; type: string; debit: string; credit: string }>) {
+  const months = new Map<string, { revenue: string; expense: string }>();
+  for (const row of rows) {
+    const month = months.get(row.month) ?? { revenue: "0.00", expense: "0.00" };
+    if (row.type === "REVENUE")
+      month.revenue = addMoney(month.revenue, subtractMoney(money(row.credit), money(row.debit)));
+    if (row.type === "EXPENSE")
+      month.expense = addMoney(month.expense, subtractMoney(money(row.debit), money(row.credit)));
+    months.set(row.month, month);
+  }
+  return months;
+}
 
 /** The range as calendar dates for DATE columns: first day of the first month, first day after the last. */
 function calendarBounds(range: ResolvedDateRange): { from: string; to: string } {

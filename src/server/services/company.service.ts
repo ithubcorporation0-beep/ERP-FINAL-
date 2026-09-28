@@ -13,6 +13,7 @@ import type { DbClient } from "@/server/repositories/helpers";
 import { membershipRepository } from "@/server/repositories/membership.repository";
 import { userRepository } from "@/server/repositories/user.repository";
 import { accessService } from "./access.service";
+import { ledgerService } from "./ledger.service";
 import { recordAuditEvent, writeAuditLog } from "./audit.service";
 
 /** Removing an old file must not fail the user's action; a leftover file is logged for cleanup. */
@@ -209,6 +210,7 @@ export const companyService = {
       }
 
       const roleIds = await accessService.ensureDefaultRoles(company.id, null, tx);
+      await ledgerService.ensureAccounts(company.id, tx);
       const superAdminRoleId = roleIds[SUPER_ADMIN_ROLE];
       if (!superAdminRoleId) throw new Error("Super Admin role was not created.");
 

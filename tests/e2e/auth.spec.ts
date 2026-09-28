@@ -58,14 +58,21 @@ test.describe("an Employee", () => {
     await signIn(page, E2E_USERS.employee.email, E2E_PASSWORD);
     const nav = page.getByRole("navigation", { name: "Main" });
     await expect(nav.getByRole("link", { name: "Projects" })).toBeVisible();
-    for (const hidden of ["Users", "Roles", "Finance", "Settings", "Audit Logs"]) {
+    for (const hidden of ["Users", "Roles", "Accounts", "Transactions", "Settings", "Audit Logs"]) {
       await expect(nav.getByRole("link", { name: hidden })).toHaveCount(0);
     }
   });
 
   test("is refused on pages outside the role, even by typing the URL", async ({ page }) => {
     await signIn(page, E2E_USERS.employee.email, E2E_PASSWORD);
-    for (const path of ["/users", "/roles", "/finance", "/settings", "/roles/new"]) {
+    for (const path of [
+      "/users",
+      "/roles",
+      "/finance/accounts",
+      "/finance/reports",
+      "/settings",
+      "/roles/new",
+    ]) {
       await page.goto(path);
       await expect(
         page.getByRole("heading", { name: "You don't have access to this page" }),

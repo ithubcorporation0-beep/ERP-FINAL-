@@ -92,6 +92,14 @@ export const customerRepository = {
     });
   },
 
+  /** Names for a set of ids (reports). */
+  namesByIds(companyId: string, ids: readonly string[], client: DbClient = db) {
+    return client.customer.findMany({
+      where: { companyId, id: { in: [...ids] } },
+      select: { id: true, name: true },
+    });
+  },
+
   /** Minimal lookup for pickers and links (e.g. "converted to CUS-0012"). */
   findSummary(companyId: string, id: string, client: DbClient = db) {
     return client.customer.findFirst({

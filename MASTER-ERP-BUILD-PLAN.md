@@ -20,7 +20,7 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 | 05  | `feat(phase-05): implement ERP dashboard`                         | ✅     |
 | 06  | `feat(phase-06): implement CRM customers and leads`               | ✅     |
 | 07  | `feat(phase-07): implement sales invoices and payments`           | ✅     |
-| 08  | `feat(phase-08): implement finance and accounting`                | ⬜     |
+| 08  | `feat(phase-08): implement expenses and accounting`               | ✅     |
 | 09  | `feat(phase-09): implement HR`                                    | ⬜     |
 | 10  | `feat(phase-10): implement payroll`                               | ⬜     |
 | 11  | `feat(phase-11): implement projects and tasks`                    | ⬜     |
@@ -131,12 +131,18 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 - ✅ Exact money arithmetic (BigInt), database CHECK constraints, audit logs, permissions (`quotations:*` added),
   tenant isolation; dashboard revenue, outstanding, monthly sales and activity now real
 
-## Phase 08 — Finance and accounting
+## Phase 08 — Expenses and accounting
 
-- ⬜ Chart of accounts, journal entries (balanced debits/credits)
-- ⬜ Automatic posting from invoices, payments, expenses
-- ⬜ Expenses with receipt upload
-- ⬜ Trial balance, P&L, balance sheet
+- ✅ Expenses: categories, receipt upload, employee, approval workflow (pending → approved / rejected), mark as paid
+- ✅ Chart of accounts (default accounts per company, custom accounts), balances on the normal side
+- ✅ Double-entry journal: balanced debits/credits enforced in code, by a CHECK constraint and a deferred trigger;
+  immutable entries, reversals, idempotent posting keys
+- ✅ Automatic postings from invoices, payments and expenses (rules S1–S4, E1–E2 in `docs/accounting.md`); existing
+  phase-07 data back-filled by the seed
+- ✅ Reports: Profit & Loss, Balance Sheet, Cash Flow, AR and AP aging (reconciled with the ledger), Expense and
+  Revenue reports; dashboard total expenses, net profit, revenue vs expenses, expense breakdown now real
+- Not in scope (documented limitations): period closing, bank reconciliation, multi-currency, tax returns, trial
+  balance export
 
 ## Phase 09 — HR
 

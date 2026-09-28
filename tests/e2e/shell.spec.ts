@@ -25,10 +25,13 @@ test.describe("desktop", () => {
     await expect(nav).toBeVisible();
     await expect(page.getByRole("button", { name: "Open navigation menu" })).toBeHidden();
 
-    await nav.getByRole("link", { name: "Finance" }).click();
-    await expect(page).toHaveURL(/\/finance$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Finance" })).toBeVisible();
-    await expect(nav.getByRole("link", { name: "Finance" })).toHaveAttribute("aria-current", "page");
+    await nav.getByRole("link", { name: "Financial reports" }).click();
+    await expect(page).toHaveURL(/\/finance\/reports$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Financial reports" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Financial reports" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
     await expect(page.getByRole("navigation", { name: "breadcrumb" })).toContainText("Finance");
   });
 

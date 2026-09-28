@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, HandCoins, Plus, ReceiptText } from "lucide-react";
+import { ArrowLeftRight, FileText, HandCoins, Plus, Receipt, ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
@@ -44,6 +44,8 @@ interface ListConfig {
   columns: {
     code: string;
     reference?: string;
+    /** Header of the "customer" column (e.g. "Employee" for expenses). Defaults to "Customer". */
+    party?: string;
     date: string;
     secondary?: string;
     amount: string;
@@ -54,11 +56,17 @@ interface ListConfig {
     description: string;
     createHref?: string;
     createLabel?: string;
-    icon: "quote" | "invoice" | "payment";
+    icon: "quote" | "invoice" | "payment" | "expense" | "journal";
   };
 }
 
-const ICONS = { quote: FileText, invoice: ReceiptText, payment: HandCoins } as const;
+const ICONS = {
+  quote: FileText,
+  invoice: ReceiptText,
+  payment: HandCoins,
+  expense: Receipt,
+  journal: ArrowLeftRight,
+} as const;
 const ALL = "all";
 const col = createDataTableColumns<SalesRow>();
 
@@ -102,7 +110,7 @@ export function SalesList({ config, rows, total, page, pageSize }: SalesListProp
               }),
             ]
           : []),
-        col.accessor("customer", { header: "Customer", enableSorting: false }),
+        col.accessor("customer", { header: config.columns.party ?? "Customer", enableSorting: false }),
         col.accessor("date", { header: config.columns.date, enableSorting: false }),
         ...(config.columns.secondary
           ? [

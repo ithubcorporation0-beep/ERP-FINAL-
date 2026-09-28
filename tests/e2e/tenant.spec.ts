@@ -53,9 +53,9 @@ test.describe("company switcher", () => {
     const page = await signedIn(browser, E2E_MULTI_USER.email, E2E_PASSWORD);
     const nav = page.getByRole("navigation", { name: "Main" });
 
-    // Default company: the seeded company, where this user is an Employee (no Finance).
-    await expect(nav.getByRole("link", { name: "Finance" })).toHaveCount(0);
-    await page.goto("/finance");
+    // Default company: the seeded company, where this user is an Employee (no accounting).
+    await expect(nav.getByRole("link", { name: "Accounts" })).toHaveCount(0);
+    await page.goto("/finance/accounts");
     await expect(page.getByRole("heading", { name: "You don't have access to this page" })).toBeVisible();
 
     await page.getByRole("button", { name: /Switch company/ }).click();
@@ -65,9 +65,9 @@ test.describe("company switcher", () => {
     ).toBeVisible();
 
     // In company B the same person is an Accountant.
-    await expect(nav.getByRole("link", { name: "Finance" })).toBeVisible();
-    await page.goto("/finance");
-    await expect(page.getByRole("heading", { level: 1, name: "Finance" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Accounts" })).toBeVisible();
+    await page.goto("/finance/accounts");
+    await expect(page.getByRole("heading", { level: 1, name: "Chart of accounts" })).toBeVisible();
 
     // Switch back so the next run starts from the default company.
     await page.getByRole("button", { name: /Switch company/ }).click();

@@ -45,7 +45,7 @@ describe("dashboard", () => {
 
     const growth = charts.find((chart) => chart.id === "customerGrowth")?.state;
     if (growth?.status !== "ready") throw new Error("growth chart not ready");
-    expect(growth.data.rows.map((row) => [row.month, row.values.added, row.values.total])).toEqual([
+    expect(growth.data.rows.map((row) => [row.key, row.values.added, row.values.total])).toEqual([
       ["2026-04", 0, 1],
       ["2026-05", 1, 2],
       ["2026-06", 0, 2],
@@ -70,8 +70,8 @@ describe("dashboard", () => {
     const { charts } = await dashboard(ctx);
     const growth = charts.find((chart) => chart.id === "customerGrowth")?.state;
     if (growth?.status !== "ready") throw new Error("growth chart not ready");
-    expect(growth.data.rows.find((row) => row.month === "2026-09")?.values.added).toBe(1);
-    expect(growth.data.rows.find((row) => row.month === "2026-08")?.values.added).toBe(0);
+    expect(growth.data.rows.find((row) => row.key === "2026-09")?.values.added).toBe(1);
+    expect(growth.data.rows.find((row) => row.key === "2026-08")?.values.added).toBe(0);
   });
 
   it("never invents figures for modules that don't exist yet", async () => {
@@ -79,7 +79,7 @@ describe("dashboard", () => {
     const { kpis, charts, activity } = await dashboard(ctx);
 
     expect(kpis).toHaveLength(9);
-    const built = ["totalCustomers", "totalRevenue", "outstandingInvoices"];
+    const built = ["totalCustomers", "totalRevenue", "outstandingInvoices", "totalExpenses", "netProfit"];
     for (const kpi of kpis.filter((item) => !built.includes(item.id))) {
       expect(kpi.state).toMatchObject({ status: "unavailable", module: expect.any(String) });
     }
@@ -89,14 +89,11 @@ describe("dashboard", () => {
 
     const growth = charts.find((chart) => chart.id === "customerGrowth")?.state;
     expect(growth).toMatchObject({ status: "ready", data: { hasData: false } });
-    expect(charts.filter((chart) => chart.state.status === "unavailable")).toHaveLength(4);
+    expect(charts.filter((chart) => chart.state.status === "unavailable")).toHaveLength(2);
 
     expect(activity.items).toEqual([]);
-    expect(activity.unavailable.map((source) => source.id)).toEqual([
-      "expenses",
-      "employeeActivity",
-      "projectUpdates",
-    ]);
+    expect(activity.unavailable.map((source) => source.id)).toEqual(["employeeActivity", "projectUpdates"]);
+    expect(kpis.find((kpi) => kpi.id === "netProfit")?.state).toMatchObject({ data: { value: "0.00" } });
   });
 
   it("shows real revenue, outstanding balance, monthly sales and sales activity per company", async () => {
@@ -142,7 +139,7 @@ describe("dashboard", () => {
     });
     const sales = charts.find((chart) => chart.id === "monthlySales")?.state;
     if (sales?.status !== "ready") throw new Error("sales chart not ready");
-    expect(sales.data.rows.map((row) => [row.month, row.values.sales])).toEqual([
+    expect(sales.data.rows.map((row) => [row.key, row.values.sales])).toEqual([
       ["2026-04", 0],
       ["2026-05", 1000.1],
       ["2026-06", 0],

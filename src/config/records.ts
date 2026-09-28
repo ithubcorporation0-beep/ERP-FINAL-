@@ -9,6 +9,8 @@ export const RECORD_PREFIXES = {
   quotation: "QUO",
   order: "SO",
   payment: "PAY",
+  expense: "EXP",
+  journal: "JE",
 } as const;
 export type RecordKind = keyof typeof RECORD_PREFIXES;
 

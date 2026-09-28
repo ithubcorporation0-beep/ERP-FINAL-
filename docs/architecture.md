@@ -199,6 +199,19 @@ link to an employee record when HR ships.
 - **Forms:** defaults that server pages spread live in plain modules (`features/*/defaults.ts`), not in
   `"use client"` files — a server component only sees a client module's exports as references.
 
+## Expenses and accounting
+
+Details and the exact posting rules: `docs/accounting.md`.
+
+| Piece                       | Where                                                                                                                  |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Expenses                    | `expense.service.ts` (`EXP-0001`): create, edit/resubmit, approve (posts E1), reject, mark paid (E2), receipt upload   |
+| Ledger                      | `ledger.service.ts`: `post()` / `reverse()` and one function per posting rule; called inside the source's transaction  |
+| Accounts and transactions   | `accounting.service.ts`: chart of accounts, manual entries (`JE-0001`), reversals, account ledger with running balance |
+| Reports                     | `financial-report.service.ts`: P&L, balance sheet, cash flow, AR/AP aging, expense and revenue reports                 |
+| Pure rules (shared, tested) | `src/lib/accounting.ts` (`checkEntry`, `normalBalance`, aging); vocabulary in `src/config/accounting.ts`               |
+| Pages                       | `/finance/expenses`, `/finance/accounts`, `/finance/transactions`, `/finance/reports`                                  |
+
 ## Backend conventions
 
 ### Authentication and authorization

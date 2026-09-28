@@ -1,15 +1,13 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { AccessDenied } from "@/components/shared/access-denied";
-import { ModulePlaceholder } from "@/components/shared/module-placeholder";
-import { getNavItem } from "@/config/navigation";
 import { authorizePage } from "@/lib/auth/page";
+import { can } from "@/lib/tenant";
 
-export const metadata: Metadata = { title: "Finance" };
-
-const HREF = "/finance";
-
+/** /finance opens the part of Finance the user may see. */
 export default async function FinancePage() {
-  // Server-side check: hiding the menu link is not protection.
-  if (!(await authorizePage(getNavItem(HREF).permission))) return <AccessDenied />;
-  return <ModulePlaceholder href={HREF} />;
+  const ctx = await authorizePage();
+  if (!ctx) return <AccessDenied />;
+  if (can(ctx, "accounting:view")) redirect("/finance/reports");
+  if (can(ctx, "expenses:view")) redirect("/finance/expenses");
+  return <AccessDenied />;
 }

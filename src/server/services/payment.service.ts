@@ -12,6 +12,7 @@ import { invoiceRepository } from "@/server/repositories/invoice.repository";
 import { numberSequenceRepository } from "@/server/repositories/number-sequence.repository";
 import { paymentRepository } from "@/server/repositories/payment.repository";
 import { writeAuditLog } from "./audit.service";
+import { ledgerService } from "./ledger.service";
 import { invoiceBalance } from "./invoice.service";
 import { salesContext } from "./sales-shared";
 
@@ -105,6 +106,8 @@ export const paymentService = {
       );
       const total = money(invoice.total);
       const state = await recompute(ctx, invoice.id, total, tx);
+      // Rule S3: money received is posted to Cash / Bank against Accounts Receivable.
+      await ledgerService.postPaymentReceived(ctx.companyId, ctx.userId, payment, tx);
       const code = formatRecordNumber("payment", number);
       await writeAuditLog(
         ctx,
@@ -154,6 +157,9 @@ export const paymentService = {
       const { count } = await paymentRepository.void(ctx.companyId, id, reason, ctx.userId, tx);
       if (count === 0) throw new ConflictError("This payment is already voided.");
       const state = await recompute(ctx, invoice.id, money(invoice.total), tx);
+      // Rule S4: the payment's posting is reversed, dated today.
+      const { today } = await salesContext(ctx);
+      await ledgerService.postPaymentVoided(ctx.companyId, ctx.userId, payment, today, tx);
       const code = formatRecordNumber("payment", payment.number);
       await writeAuditLog(
         ctx,

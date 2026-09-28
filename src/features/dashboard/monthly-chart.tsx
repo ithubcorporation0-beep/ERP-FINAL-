@@ -70,7 +70,7 @@ export function MonthlyChart({
         <caption>{title}</caption>
         <thead>
           <tr>
-            <th scope="col">Month</th>
+            <th scope="col">Period</th>
             {data.series.map((series) => (
               <th key={series.key} scope="col">
                 {series.label}
@@ -80,7 +80,7 @@ export function MonthlyChart({
         </thead>
         <tbody>
           {data.rows.map((row) => (
-            <tr key={row.month}>
+            <tr key={row.key}>
               <th scope="row">{row.label}</th>
               {data.series.map((series) => (
                 <td key={series.key}>{number.format(row.values[series.key] ?? 0)}</td>

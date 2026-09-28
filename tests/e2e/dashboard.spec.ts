@@ -27,7 +27,7 @@ test("Super Admin sees every widget; modules not built yet say so instead of sho
   for (const label of ["Total revenue", "Net profit", "Total customers", "Low stock items"]) {
     await expect(figures(page).getByText(label, { exact: true })).toBeVisible();
   }
-  await expect(figures(page).getByText(/Not tracked yet/)).toHaveCount(6);
+  await expect(figures(page).getByText(/Not tracked yet/)).toHaveCount(4);
   await expect(page.getByRole("heading", { name: "Customer growth" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Revenue vs expenses" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Recent activity" })).toBeVisible();
@@ -35,7 +35,11 @@ test("Super Admin sees every widget; modules not built yet say so instead of sho
     "href",
     "/sales/invoices/new",
   );
-  await expect(page.getByRole("button", { name: /Add expense/ })).toBeDisabled();
+  await expect(page.getByRole("link", { name: /Add expense/ })).toHaveAttribute(
+    "href",
+    "/finance/expenses/new",
+  );
+  await expect(page.getByRole("button", { name: /Add employee/ })).toBeDisabled();
 });
 
 test("date filter is kept in the URL and reloads the figures", async ({ browser }) => {

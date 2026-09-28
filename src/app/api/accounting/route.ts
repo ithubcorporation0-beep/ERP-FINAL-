@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { handle } from "@/lib/api";
 import { requirePermission } from "@/lib/tenant";
+import { accountingService } from "@/server/services/accounting.service";
 
-// TODO: implement following the customers module (repository → service → route).
+/** The chart of accounts with each account's balance. */
 export const GET = handle(async () => {
-  await requirePermission("accounting:view");
-  return NextResponse.json({ error: "Not implemented" }, { status: 501 });
+  const ctx = await requirePermission("accounting:view");
+  return NextResponse.json(await accountingService.accounts(ctx));
 });

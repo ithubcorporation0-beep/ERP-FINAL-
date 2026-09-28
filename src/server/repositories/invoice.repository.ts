@@ -215,6 +215,25 @@ export const invoiceRepository = {
     });
   },
 
+  /** Invoices that were issued at some point (for posting them to the ledger). */
+  listIssuedForLedger(companyId: string, client: DbClient = db) {
+    return client.invoice.findMany({
+      where: { companyId, deletedAt: null, sentAt: { not: null } },
+      select: {
+        id: true,
+        code: true,
+        status: true,
+        invoiceDate: true,
+        cancelledAt: true,
+        subtotal: true,
+        discountTotal: true,
+        taxTotal: true,
+        total: true,
+        customer: { select: { name: true } },
+      },
+    });
+  },
+
   // ─── Dashboard figures ───
 
   /** Total of issued invoices dated `from` ≤ invoice_date < `to` (calendar dates). */
@@ -257,6 +276,39 @@ export const invoiceRepository = {
       GROUP BY 1
       ORDER BY 1`);
     return monthlyRows.parse(rows);
+  },
+
+  /** Issued totals per customer for invoices dated in the range (largest first). */
+  async sumIssuedByCustomer(
+    companyId: string,
+    { from, to }: { from: string; to: string },
+    client: DbClient = db,
+  ) {
+    const rows = await client.invoice.groupBy({
+      by: ["customerId"],
+      where: {
+        companyId,
+        deletedAt: null,
+        status: { in: ISSUED },
+        invoiceDate: { gte: dateOnlyToDate(from), lt: dateOnlyToDate(to) },
+      },
+      _sum: { total: true },
+      _count: { _all: true },
+    });
+    return rows.map((row) => ({
+      customerId: row.customerId,
+      total: row._sum.total?.toString() ?? "0",
+      count: row._count._all,
+    }));
+  },
+
+  /** Open invoices (sent / partially paid) with their balance inputs, oldest due first — for receivables aging. */
+  listOpen(companyId: string, client: DbClient = db) {
+    return client.invoice.findMany({
+      where: { companyId, deletedAt: null, status: { in: [...OPEN_INVOICE_STATUSES] } },
+      select: { ...listSelect, customerId: true },
+      orderBy: [{ dueDate: "asc" }, { number: "asc" }],
+    });
   },
 
   listRecent(companyId: string, limit: number, client: DbClient = db) {

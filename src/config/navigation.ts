@@ -7,6 +7,10 @@ export type NavIconName =
   | "quotations"
   | "orders"
   | "payments"
+  | "expenses"
+  | "accounts"
+  | "transactions"
+  | "statements"
   | "sales"
   | "finance"
   | "hr"
@@ -107,11 +111,32 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "Finance",
     items: [
       {
-        label: "Finance",
-        href: "/finance",
-        icon: "finance",
+        label: "Expenses",
+        href: "/finance/expenses",
+        icon: "expenses",
+        permission: "expenses:view",
+        description: "Submit expenses with receipts; approvers approve or reject them.",
+      },
+      {
+        label: "Accounts",
+        href: "/finance/accounts",
+        icon: "accounts",
         permission: "accounting:view",
-        description: "Chart of accounts, journal entries, expenses and statements.",
+        description: "Chart of accounts with balances and transaction history.",
+      },
+      {
+        label: "Transactions",
+        href: "/finance/transactions",
+        icon: "transactions",
+        permission: "accounting:view",
+        description: "Every posting in the ledger, automatic and manual.",
+      },
+      {
+        label: "Financial reports",
+        href: "/finance/reports",
+        icon: "statements",
+        permission: "accounting:view",
+        description: "Profit & loss, balance sheet, cash flow, receivables, payables, expenses and revenue.",
       },
     ],
   },

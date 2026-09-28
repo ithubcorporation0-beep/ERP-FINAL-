@@ -8,7 +8,7 @@ import { DATE_RANGE_LABELS, DATE_RANGE_PRESETS, type DateRangePreset } from "@/l
 
 const OPTIONS = DATE_RANGE_PRESETS.map((preset) => ({ value: preset, label: DATE_RANGE_LABELS[preset] }));
 
-/** Date filter for the dashboard. Keeps the choice in the URL (`?range=`) so it survives reloads and can be shared. */
+/** Date filter for the dashboard and financial reports. Keeps the choice in the URL (`?range=`) so it survives reloads and can be shared. */
 export function RangeFilter({ value }: { value: DateRangePreset }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -24,7 +24,7 @@ export function RangeFilter({ value }: { value: DateRangePreset }) {
   return (
     <div className="flex items-center gap-2">
       {pending ? (
-        <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Updating dashboard" />
+        <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Updating" />
       ) : null}
       <SelectInput aria-label="Date range" options={OPTIONS} value={value} onValueChange={change} />
     </div>
