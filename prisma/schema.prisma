@@ -81,6 +81,12 @@ model Company {
   journalEntries         JournalEntry[]
   journalLines           JournalLine[]
   expenses               Expense[]
+  departments            Department[]
+  employees              Employee[]
+  employeeCompensations  EmployeeCompensation[]
+  employeeDocuments      EmployeeDocument[]
+  attendanceRecords      AttendanceRecord[]
+  leaveRequests          LeaveRequest[]
   notifications          Notification[]
   authTokens             AuthToken[]
   sessions               Session[]
@@ -162,6 +168,18 @@ model User {
   expensesCreated               Expense[]               @relation("ExpenseCreatedBy")
   expensesUpdated               Expense[]               @relation("ExpenseUpdatedBy")
   authTokensCreated             AuthToken[]             @relation("AuthTokenCreatedBy")
+  departmentsCreated            Department[]            @relation("DepartmentCreatedBy")
+  departmentsUpdated            Department[]            @relation("DepartmentUpdatedBy")
+  employeeProfiles              Employee[]              @relation("EmployeeUser")
+  employeesCreated              Employee[]              @relation("EmployeeCreatedBy")
+  employeesUpdated              Employee[]              @relation("EmployeeUpdatedBy")
+  compensationsUpdated          EmployeeCompensation[]  @relation("EmployeeCompensationUpdatedBy")
+  employeeDocumentsCreated      EmployeeDocument[]      @relation("EmployeeDocumentCreatedBy")
+  attendanceCreated             AttendanceRecord[]      @relation("AttendanceCreatedBy")
+  attendanceUpdated             AttendanceRecord[]      @relation("AttendanceUpdatedBy")
+  leaveRequestsDecided          LeaveRequest[]          @relation("LeaveDecidedBy")
+  leaveRequestsCreated          LeaveRequest[]          @relation("LeaveCreatedBy")
+  leaveRequestsUpdated          LeaveRequest[]          @relation("LeaveUpdatedBy")
 
   @@map("users")
 }
@@ -981,6 +999,235 @@ model Expense {
 }
 
 /// Per-company counters for human-readable numbers (customers, leads; invoices later). Incremented atomically.
+// ─── HR (phase 09): employees, departments, attendance, leave. Rules: docs/hr.md ───
+
+model Department {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  name        String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by") @db.Uuid
+  updatedById String?  @map("updated_by") @db.Uuid
+
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdBy User?      @relation("DepartmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?      @relation("DepartmentUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  employees Employee[]
+
+  @@unique([companyId, name])
+  @@unique([id, companyId])
+  @@map("departments")
+}
+
+enum EmploymentStatus {
+  PROBATION
+  ACTIVE
+  ON_NOTICE
+  SUSPENDED
+  RESIGNED
+  TERMINATED
+}
+
+/// An employee record. Salary and bank details live in `employee_compensations` (restricted, see docs/hr.md).
+model Employee {
+  id                       String           @id @default(uuid(7)) @db.Uuid
+  companyId                String           @map("company_id") @db.Uuid
+  /// "EMP-0001", per company.
+  number                   Int
+  /// The login used for self-service attendance and leave (optional; a member of this company).
+  userId                   String?          @map("user_id") @db.Uuid
+  name                     String
+  email                    String?
+  phone                    String?
+  /// National ID (e.g. CNIC) or another identification number.
+  identificationNumber     String?          @map("identification_number")
+  departmentId             String?          @map("department_id") @db.Uuid
+  position                 String?
+  joiningDate              DateTime         @map("joining_date") @db.Date
+  status                   EmploymentStatus @default(ACTIVE)
+  /// Last day of work, required for resigned / terminated employees.
+  exitDate                 DateTime?        @map("exit_date") @db.Date
+  photoKey                 String?          @unique @map("photo_key")
+  photoContentType         String?          @map("photo_content_type")
+  photoUpdatedAt           DateTime?        @map("photo_updated_at") @db.Timestamptz(3)
+  emergencyContactName     String?          @map("emergency_contact_name")
+  emergencyContactRelation String?          @map("emergency_contact_relation")
+  emergencyContactPhone    String?          @map("emergency_contact_phone")
+  notes                    String?
+  createdAt                DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById              String?          @map("created_by") @db.Uuid
+  updatedById              String?          @map("updated_by") @db.Uuid
+  deletedAt                DateTime?        @map("deleted_at") @db.Timestamptz(3)
+
+  company      Company               @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user         User?                 @relation("EmployeeUser", fields: [userId], references: [id], onDelete: SetNull)
+  department   Department?           @relation(fields: [departmentId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy    User?                 @relation("EmployeeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy    User?                 @relation("EmployeeUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  compensation EmployeeCompensation?
+  documents    EmployeeDocument[]
+  attendance   AttendanceRecord[]
+  leaves       LeaveRequest[]
+
+  @@unique([companyId, number])
+  @@unique([companyId, userId])
+  @@unique([id, companyId])
+  @@index([companyId, deletedAt, status])
+  @@index([companyId, departmentId])
+  @@index([companyId, name])
+  @@map("employees")
+}
+
+/// Salary and bank details, kept apart from the employee row so ordinary queries never load them. Needs
+/// `salaries:view` / `salaries:edit`. Account number and IBAN are encrypted (AES-256-GCM, DATA_ENCRYPTION_KEY).
+model EmployeeCompensation {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  companyId           String   @map("company_id") @db.Uuid
+  employeeId          String   @map("employee_id") @db.Uuid
+  /// Gross monthly salary.
+  salary              Decimal? @db.Decimal(18, 2)
+  currency            String   @db.Char(3)
+  bankName            String?  @map("bank_name")
+  accountTitle        String?  @map("account_title")
+  /// Ciphertext ("v1:…"); decrypted only for people allowed to reveal it.
+  accountNumberCipher String?  @map("account_number_cipher")
+  accountNumberLast4  String?  @map("account_number_last4") @db.VarChar(4)
+  ibanCipher          String?  @map("iban_cipher")
+  ibanLast4           String?  @map("iban_last4") @db.VarChar(4)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById         String?  @map("updated_by") @db.Uuid
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  employee  Employee @relation(fields: [employeeId, companyId], references: [id, companyId], onDelete: Restrict)
+  updatedBy User?    @relation("EmployeeCompensationUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([employeeId, companyId])
+  @@index([companyId])
+  @@map("employee_compensations")
+}
+
+model EmployeeDocument {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  employeeId  String   @map("employee_id") @db.Uuid
+  /// Original file name, cleaned for display and downloads.
+  name        String
+  storageKey  String   @unique @map("storage_key")
+  contentType String   @map("content_type")
+  sizeBytes   Int      @map("size_bytes")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by") @db.Uuid
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  employee  Employee @relation(fields: [employeeId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy User?    @relation("EmployeeDocumentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, employeeId, createdAt(sort: Desc)])
+  @@map("employee_documents")
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  HALF_DAY
+  ABSENT
+}
+
+enum AttendanceSource {
+  /// The employee checked in / out in the app (server time).
+  SELF
+  /// Entered or corrected by HR.
+  MANUAL
+}
+
+/// One employee's attendance on one calendar day (company time zone). Days without a record are derived as
+/// absent or on leave when reports are computed.
+model AttendanceRecord {
+  id                String           @id @default(uuid(7)) @db.Uuid
+  companyId         String           @map("company_id") @db.Uuid
+  employeeId        String           @map("employee_id") @db.Uuid
+  date              DateTime         @db.Date
+  checkInAt         DateTime?        @map("check_in_at") @db.Timestamptz(3)
+  checkOutAt        DateTime?        @map("check_out_at") @db.Timestamptz(3)
+  status            AttendanceStatus
+  lateMinutes       Int              @default(0) @map("late_minutes")
+  earlyLeaveMinutes Int              @default(0) @map("early_leave_minutes")
+  workedMinutes     Int?             @map("worked_minutes")
+  source            AttendanceSource
+  note              String?
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById       String?          @map("created_by") @db.Uuid
+  updatedById       String?          @map("updated_by") @db.Uuid
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  employee  Employee @relation(fields: [employeeId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy User?    @relation("AttendanceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?    @relation("AttendanceUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, employeeId, date])
+  @@index([companyId, date])
+  @@map("attendance_records")
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  CASUAL
+  UNPAID
+  MATERNITY
+  PATERNITY
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model LeaveRequest {
+  id                    String      @id @default(uuid(7)) @db.Uuid
+  companyId             String      @map("company_id") @db.Uuid
+  /// "LV-0001", per company.
+  number                Int
+  employeeId            String      @map("employee_id") @db.Uuid
+  type                  LeaveType
+  startDate             DateTime    @map("start_date") @db.Date
+  endDate               DateTime    @map("end_date") @db.Date
+  /// Working days covered (company work schedule at the time of the request).
+  days                  Int
+  reason                String
+  attachmentKey         String?     @unique @map("attachment_key")
+  attachmentName        String?     @map("attachment_name")
+  attachmentContentType String?     @map("attachment_content_type")
+  attachmentSize        Int?        @map("attachment_size")
+  status                LeaveStatus @default(PENDING)
+  decisionNote          String?     @map("decision_note")
+  decidedById           String?     @map("decided_by") @db.Uuid
+  decidedAt             DateTime?   @map("decided_at") @db.Timestamptz(3)
+  createdAt             DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById           String?     @map("created_by") @db.Uuid
+  updatedById           String?     @map("updated_by") @db.Uuid
+  deletedAt             DateTime?   @map("deleted_at") @db.Timestamptz(3)
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  employee  Employee @relation(fields: [employeeId, companyId], references: [id, companyId], onDelete: Restrict)
+  decidedBy User?    @relation("LeaveDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  createdBy User?    @relation("LeaveCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?    @relation("LeaveUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, number])
+  @@index([companyId, employeeId, startDate])
+  @@index([companyId, deletedAt, status])
+  @@map("leave_requests")
+}
+
 model NumberSequence {
   companyId String   @map("company_id") @db.Uuid
   /// e.g. "customer", "lead".

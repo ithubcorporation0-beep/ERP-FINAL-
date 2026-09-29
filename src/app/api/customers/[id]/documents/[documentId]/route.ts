@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { handle, routeId } from "@/lib/api";
-import { attachmentHeader } from "@/lib/storage/documents";
+import { fileDownload, handle, routeId } from "@/lib/api";
 import { requirePermission } from "@/lib/tenant";
 import { customerDocumentService } from "@/server/services/customer-document.service";
 
@@ -15,16 +14,7 @@ export const GET = handle(async (_req: Request, { params }: Context) => {
     routeId(id, "Customer"),
     routeId(documentId, "Document"),
   );
-  return new NextResponse(new Uint8Array(body), {
-    headers: {
-      "Content-Type": document.contentType,
-      "Content-Length": String(body.byteLength),
-      "Content-Disposition": attachmentHeader(document.name),
-      "Cache-Control": "private, no-store",
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'; sandbox",
-    },
-  });
+  return fileDownload(body, document.name, document.contentType);
 });
 
 export const DELETE = handle(async (_req: Request, { params }: Context) => {

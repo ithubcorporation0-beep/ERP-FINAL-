@@ -30,24 +30,25 @@ Read `docs/architecture.md` before starting work.
 
 ## Where things go
 
-| Concern                             | Location                                                                                                                                   |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Prisma queries                      | `src/server/repositories/*.repository.ts` — only place that calls `db.<model>` for business data                                           |
-| Business rules, transactions, audit | `src/server/services/*.service.ts`                                                                                                         |
-| Route handlers / server actions     | `src/app/api/**`, `src/server/actions/**` — parse → authorize → call service                                                               |
-| Zod schemas                         | `src/lib/validation` (env vars: `src/lib/env/schema.ts`)                                                                                   |
-| Prisma types                        | `@/generated/prisma/client` (generated, never edit)                                                                                        |
-| Errors / logging                    | Throw `AppError`s from `@/lib/errors`; wrap routes in `handle()`, actions in `runAction()`; log with `@/lib/logger`                        |
-| Permissions / auth                  | Keys in `src/lib/permissions` (`PERMISSION_KEYS`); helpers in `src/lib/tenant` and `src/lib/auth/page.ts`; see `docs/permissions.md`       |
-| Company settings                    | Registry `src/lib/settings/registry.ts` + `settingsService`                                                                                |
-| File uploads                        | `src/lib/storage` (`getStorage()`, `companyKey()`); keys always under `companies/<companyId>/`                                             |
-| Dashboard widgets                   | Declare in `src/config/dashboard.ts`; data from a provider in `dashboard.service.ts` (no provider = "not tracked yet", never fake numbers) |
-| Money                               | `src/lib/money.ts` (decimal strings + BigInt). Never calculate money with JS numbers                                                       |
-| New company-owned table             | Checklist in `docs/database.md` → Tenancy enforcement (incl. `TENANT_MODELS`)                                                              |
-| Database conventions                | `docs/database.md` (snake_case, UUID v7, `company_id`, audit columns, composite FKs)                                                       |
-| shadcn/ui primitives                | `src/components/ui` — add with `npx shadcn@latest add <name>`                                                                              |
-| Shared UI                           | `src/components/**` — no data access (ESLint enforces this)                                                                                |
-| Module UI                           | `src/features/<module>`                                                                                                                    |
+| Concern                              | Location                                                                                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Prisma queries                       | `src/server/repositories/*.repository.ts` — only place that calls `db.<model>` for business data                                           |
+| Business rules, transactions, audit  | `src/server/services/*.service.ts`                                                                                                         |
+| Route handlers / server actions      | `src/app/api/**`, `src/server/actions/**` — parse → authorize → call service                                                               |
+| Zod schemas                          | `src/lib/validation` (env vars: `src/lib/env/schema.ts`)                                                                                   |
+| Prisma types                         | `@/generated/prisma/client` (generated, never edit)                                                                                        |
+| Errors / logging                     | Throw `AppError`s from `@/lib/errors`; wrap routes in `handle()`, actions in `runAction()`; log with `@/lib/logger`                        |
+| Permissions / auth                   | Keys in `src/lib/permissions` (`PERMISSION_KEYS`); helpers in `src/lib/tenant` and `src/lib/auth/page.ts`; see `docs/permissions.md`       |
+| Company settings                     | Registry `src/lib/settings/registry.ts` + `settingsService`                                                                                |
+| File uploads                         | `src/lib/storage` (`getStorage()`, `companyKey()`); keys always under `companies/<companyId>/`                                             |
+| Dashboard widgets                    | Declare in `src/config/dashboard.ts`; data from a provider in `dashboard.service.ts` (no provider = "not tracked yet", never fake numbers) |
+| Restricted personal data (pay, bank) | Separate table + own permission; encrypt identifiers with `src/lib/crypto/field-encryption.ts`; never in audit values — see `docs/hr.md`   |
+| Money                                | `src/lib/money.ts` (decimal strings + BigInt). Never calculate money with JS numbers                                                       |
+| New company-owned table              | Checklist in `docs/database.md` → Tenancy enforcement (incl. `TENANT_MODELS`)                                                              |
+| Database conventions                 | `docs/database.md` (snake_case, UUID v7, `company_id`, audit columns, composite FKs)                                                       |
+| shadcn/ui primitives                 | `src/components/ui` — add with `npx shadcn@latest add <name>`                                                                              |
+| Shared UI                            | `src/components/**` — no data access (ESLint enforces this)                                                                                |
+| Module UI                            | `src/features/<module>`                                                                                                                    |
 
 Reference implementation: the `customers` module.
 

@@ -13,6 +13,13 @@ export function formatDateTime(value: Date, { locale, timeZone }: CompanyFormat)
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone }).format(value);
 }
 
+export function formatTime(
+  value: Date,
+  { locale, timeZone }: Pick<CompanyFormat, "locale" | "timeZone">,
+): string {
+  return new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone }).format(value);
+}
+
 /** A DATE column (no time zone): shown as the calendar date it was entered as. */
 export function formatCalendarDate(value: Date, { locale }: Pick<CompanyFormat, "locale">): string {
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(value);

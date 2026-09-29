@@ -8,6 +8,7 @@ export const IMAGE_TYPES = {
 export type ImageType = keyof typeof IMAGE_TYPES;
 
 export const MAX_LOGO_BYTES = 1024 * 1024; // 1 MB
+export const MAX_PHOTO_BYTES = 2 * 1024 * 1024; // 2 MB (employee photos)
 
 function startsWith(bytes: Uint8Array, signature: readonly number[], offset = 0): boolean {
   return signature.every((byte, index) => bytes[offset + index] === byte);

@@ -112,7 +112,7 @@ export const CHART_WIDGETS: readonly WidgetDefinition<ChartId>[] = [
   {
     id: "employeeAttendance",
     label: "Employee attendance",
-    description: "Present, late and absent per month.",
+    description: "Employee-days present, late, absent and on leave per month.",
     source: "hr",
     permissions: ["employees:view"],
   },
@@ -184,7 +184,13 @@ export const QUICK_ACTIONS: readonly QuickActionDefinition[] = [
     permission: "expenses:create",
     href: "/finance/expenses/new",
   },
-  { id: "addEmployee", label: "Add employee", source: "hr", permission: "employees:create" },
+  {
+    id: "addEmployee",
+    label: "Add employee",
+    source: "hr",
+    permission: "employees:create",
+    href: "/hr/employees/new",
+  },
   { id: "createProject", label: "Create project", source: "projects", permission: "projects:create" },
   { id: "addProduct", label: "Add product", source: "inventory", permission: "products:create" },
   {

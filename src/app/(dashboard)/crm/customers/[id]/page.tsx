@@ -243,7 +243,7 @@ export default async function CustomerPage({ params }: PageProps<"/crm/customers
 
         <TabsContent value="documents">
           <DocumentPanel
-            customerId={id}
+            endpoint={`/api/customers/${id}/documents`}
             canEdit={canEdit}
             documents={documents.map((document) => ({
               id: document.id,

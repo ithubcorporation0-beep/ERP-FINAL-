@@ -37,6 +37,9 @@ describe("company profile validation", () => {
   });
 });
 
+/** Test-only key: 32 bytes, base64. */
+const KEY = Buffer.alloc(32, 1).toString("base64");
+
 describe("storage configuration", () => {
   const base = { DATABASE_URL: "postgresql://u:p@localhost/db" };
 
@@ -49,8 +52,28 @@ describe("storage configuration", () => {
 
   it("allows an explicit local driver in production (single server with a persistent disk)", () => {
     expect(
-      parseServerEnv({ ...base, NODE_ENV: "production", EMAIL_TRANSPORT: "console", STORAGE_DRIVER: "local" })
-        .STORAGE_DRIVER,
+      parseServerEnv({
+        ...base,
+        NODE_ENV: "production",
+        EMAIL_TRANSPORT: "console",
+        STORAGE_DRIVER: "local",
+        DATA_ENCRYPTION_KEY: KEY,
+      }).STORAGE_DRIVER,
     ).toBe("local");
+  });
+});
+
+describe("data encryption key", () => {
+  const base = { DATABASE_URL: "postgresql://u:p@localhost/db" };
+  const production = { ...base, NODE_ENV: "production", EMAIL_TRANSPORT: "console", STORAGE_DRIVER: "local" };
+
+  it("is required in production and must be 32 bytes", () => {
+    expect(() => parseServerEnv(production)).toThrow(/DATA_ENCRYPTION_KEY is required in production/);
+    expect(() => parseServerEnv({ ...production, DATA_ENCRYPTION_KEY: "c2hvcnQ=" })).toThrow(/32 bytes/);
+    expect(parseServerEnv({ ...production, DATA_ENCRYPTION_KEY: KEY }).DATA_ENCRYPTION_KEY).toBe(KEY);
+  });
+
+  it("is optional in development", () => {
+    expect(parseServerEnv(base).DATA_ENCRYPTION_KEY).toBeUndefined();
   });
 });

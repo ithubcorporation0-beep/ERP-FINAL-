@@ -34,6 +34,8 @@ jobs:
       EMAIL_TRANSPORT: console
       # CI has no object storage: uploads go to a local folder.
       STORAGE_DRIVER: local
+      # CI-only throwaway key for encrypting test bank details (never used with real data).
+      DATA_ENCRYPTION_KEY: Y2ktb25seS10aHJvd2F3YXkta2V5LTMyLWJ5dGVzISE=
       # CI-only throwaway credentials for the seeded admin used by the e2e tests.
       SEED_ADMIN_EMAIL: e2e-admin@example.com
       SEED_ADMIN_PASSWORD: ci-only-password-123

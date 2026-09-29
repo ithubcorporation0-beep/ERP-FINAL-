@@ -23,20 +23,21 @@ const ACCEPT = ".pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx,.csv,.txt";
 const MAX_BYTES = 10 * 1024 * 1024;
 
 interface DocumentPanelProps {
-  customerId: string;
+  /** Collection endpoint, e.g. `/api/customers/<id>/documents`; files are at `<endpoint>/<documentId>`. */
+  endpoint: string;
   documents: DocumentEntry[];
   canEdit: boolean;
 }
 
-/** Upload, download and delete a customer's documents. The server checks every file again. */
-export function DocumentPanel({ customerId, documents, canEdit }: DocumentPanelProps) {
+/** Upload, download and delete a record's documents (customers, employees). The server checks every file again. */
+export function DocumentPanel({ endpoint, documents, canEdit }: DocumentPanelProps) {
   const router = useRouter();
   const inputId = useId();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [removing, setRemoving] = useState<DocumentEntry | null>(null);
-  const base = `/api/customers/${customerId}/documents`;
+  const base = endpoint;
 
   async function upload(file: File) {
     setError(undefined);

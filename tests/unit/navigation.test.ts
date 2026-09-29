@@ -32,10 +32,18 @@ describe("navigation", () => {
 
   it("hides modules a role cannot read", () => {
     const hrefs = allowedNavHrefs(rolePermissions("Employee"));
-    expect(hrefs).toEqual(["/dashboard", "/finance/expenses", "/projects", "/notifications"]);
+    expect(hrefs).toEqual([
+      "/dashboard",
+      "/finance/expenses",
+      "/hr/attendance",
+      "/hr/leave",
+      "/projects",
+      "/notifications",
+    ]);
     expect(visibleNavSections(hrefs).map((section) => section.title)).toEqual([
       "Overview",
       "Finance",
+      "People",
       "Operations",
       "Personal",
     ]);

@@ -21,7 +21,7 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 | 06  | `feat(phase-06): implement CRM customers and leads`               | ✅     |
 | 07  | `feat(phase-07): implement sales invoices and payments`           | ✅     |
 | 08  | `feat(phase-08): implement expenses and accounting`               | ✅     |
-| 09  | `feat(phase-09): implement HR`                                    | ⬜     |
+| 09  | `feat(phase-09): implement HR employees attendance and leave`     | ✅     |
 | 10  | `feat(phase-10): implement payroll`                               | ⬜     |
 | 11  | `feat(phase-11): implement projects and tasks`                    | ⬜     |
 | 12  | `feat(phase-12): implement inventory and purchasing`              | ⬜     |
@@ -146,7 +146,17 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 
 ## Phase 09 — HR
 
-- ⬜ Employees, attendance check-in/out, leave requests with approval
+- ✅ Employees (`EMP-0001`): profile, photo, CNIC/identification, department, position, joining date, emergency
+  contact, documents, login link, employment status workflow with exit date; departments
+- ✅ Salary and bank details in a separate restricted table: `salaries:view` / `salaries:edit`, account number and
+  IBAN encrypted (AES-256-GCM, `DATA_ENCRYPTION_KEY`), masked by default, audited reveal, never in audit values
+- ✅ Attendance: server-time check-in/out, late / early departure / half day / absent / on leave rules from the
+  company work schedule, HR entries and corrections, history, today's dashboard, per-employee report
+- ✅ Leave (`LV-0001`): types, working-day count, attachment, overlap check, Pending → Approved / Rejected with
+  no self-approval, cancel
+- ✅ Dashboard: total employees, employee attendance chart, employee activity; "Add employee" quick action
+- Documented as future (not implemented): GPS, device/IP restrictions, biometrics, shifts, leave balances
+  (`docs/hr.md`)
 
 ## Phase 10 — Payroll
 

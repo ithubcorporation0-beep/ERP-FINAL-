@@ -14,6 +14,10 @@ export type NavIconName =
   | "sales"
   | "finance"
   | "hr"
+  | "employees"
+  | "departments"
+  | "attendance"
+  | "leave"
   | "payroll"
   | "projects"
   | "inventory"
@@ -144,11 +148,32 @@ export const NAV_SECTIONS: NavSection[] = [
     title: "People",
     items: [
       {
-        label: "HR",
-        href: "/hr",
-        icon: "hr",
+        label: "Employees",
+        href: "/hr/employees",
+        icon: "employees",
         permission: "employees:view",
-        description: "Employees, attendance and leave requests.",
+        description: "Employee profiles, documents and employment status.",
+      },
+      {
+        label: "Departments",
+        href: "/hr/departments",
+        icon: "departments",
+        permission: "employees:view",
+        description: "Departments employees belong to.",
+      },
+      {
+        label: "Attendance",
+        href: "/hr/attendance",
+        icon: "attendance",
+        permission: "attendance:view",
+        description: "Check in and out, today's attendance, history and reports.",
+      },
+      {
+        label: "Leave",
+        href: "/hr/leave",
+        icon: "leave",
+        permission: "leaves:view",
+        description: "Leave requests and approvals.",
       },
       {
         label: "Payroll",

@@ -59,6 +59,12 @@ const baseSchema = z.object({
   STORAGE_BUCKET: optional,
   STORAGE_ACCESS_KEY: optional,
   STORAGE_SECRET_KEY: optional,
+
+  /**
+   * Key that encrypts restricted personal data at rest (employee bank account numbers): 32 random bytes,
+   * base64-encoded (`openssl rand -base64 32`). Required in production. Changing it makes stored values unreadable.
+   */
+  DATA_ENCRYPTION_KEY: optional,
 });
 
 export const serverEnvSchema = baseSchema
@@ -94,6 +100,20 @@ export const serverEnvSchema = baseSchema
           });
         }
       }
+    }
+    if (env.DATA_ENCRYPTION_KEY && Buffer.from(env.DATA_ENCRYPTION_KEY, "base64").byteLength !== 32) {
+      context.addIssue({
+        code: "custom",
+        path: ["DATA_ENCRYPTION_KEY"],
+        message: "DATA_ENCRYPTION_KEY must be 32 bytes, base64-encoded (openssl rand -base64 32)",
+      });
+    }
+    if (!env.DATA_ENCRYPTION_KEY && env.NODE_ENV === "production") {
+      context.addIssue({
+        code: "custom",
+        path: ["DATA_ENCRYPTION_KEY"],
+        message: "DATA_ENCRYPTION_KEY is required in production",
+      });
     }
     if (env.EMAIL_TRANSPORT === "memory" && env.NODE_ENV !== "test") {
       context.addIssue({

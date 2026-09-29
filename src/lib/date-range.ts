@@ -111,6 +111,17 @@ export function zonedMonthStart(year: number, month: number, timeZone: string): 
   return new Date(wallClock - offsetMs(firstGuess, timeZone));
 }
 
+/**
+ * The instant a local wall-clock time happens: `minutes` after local midnight on `date` ("YYYY-MM-DD") in
+ * `timeZone`. Handles DST changes the same way as zonedMonthStart.
+ */
+export function zonedInstant(date: string, minutes: number, timeZone: string): Date {
+  const [year = 1970, month = 1, day = 1] = date.split("-").map(Number);
+  const wallClock = Date.UTC(year, month - 1, day, 0, minutes);
+  const firstGuess = wallClock - offsetMs(wallClock, timeZone);
+  return new Date(wallClock - offsetMs(firstGuess, timeZone));
+}
+
 function monthKey(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, "0")}`;
 }

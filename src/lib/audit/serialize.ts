@@ -3,7 +3,18 @@ import type { Prisma } from "@/generated/prisma/client";
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 
 /** Keys never written to the audit log, wherever they appear. */
-const REDACTED_KEYS = new Set(["passwordHash", "tokenHash", "password", "token"]);
+/** Secrets and restricted personal data (salary, bank details) never go into audit_logs. */
+const REDACTED_KEYS = new Set([
+  "passwordHash",
+  "tokenHash",
+  "password",
+  "token",
+  "salary",
+  "accountNumber",
+  "accountNumberCipher",
+  "iban",
+  "ibanCipher",
+]);
 
 function toJson(value: unknown, depth: number): Json {
   if (depth > 8) return "[truncated]";

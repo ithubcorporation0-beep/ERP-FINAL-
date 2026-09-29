@@ -49,7 +49,28 @@ Ids are UUIDs (v7). The company is always taken from the signed-in user's member
 
 List responses: `{ items, total, page, pageSize }`. Records include `companyId`, `createdAt`, `updatedAt`, `createdById`, `updatedById`.
 
+## HR (phase 09)
+
+Rules: `docs/hr.md`. People who may only see their own attendance / leave get only their own records.
+
+| Method              | Path                                                                                                    | Permission                                             |
+| ------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| GET / POST          | `/api/employees?search=&status=&departmentId=`                                                          | `employees:view` / `employees:create`                  |
+| GET / PUT / DELETE  | `/api/employees/:id` (never includes salary or bank)                                                    | `employees:view` / `edit` / `delete`                   |
+| POST                | `/api/employees/:id/status` `{ status, exitDate?, note? }`                                              | `employees:edit`                                       |
+| GET / POST / DELETE | `/api/employees/:id/photo` (multipart `file`)                                                           | `employees:view` / `employees:edit`                    |
+| GET / POST          | `/api/employees/:id/documents`, `…/documents/:documentId` (GET, DELETE)                                 | `employees:view` / `employees:edit`                    |
+| GET / PUT           | `/api/employees/:id/compensation` (`?reveal=1` = full bank numbers, audited)                            | `salaries:view` / `salaries:edit`                      |
+| GET / POST          | `/api/departments`; PUT / DELETE `/api/departments/:id`                                                 | `employees:view` / `create` / `edit` / `delete`        |
+| POST                | `/api/attendance/check-in`, `/api/attendance/check-out` (server time)                                   | `attendance:create`                                    |
+| GET / POST          | `/api/attendance?employeeId=&range=` / HR entry `{ employeeId, date, absent, checkIn, checkOut, note }` | `attendance:view` / `attendance:edit`                  |
+| GET / DELETE        | `/api/attendance/:id`                                                                                   | `attendance:view` / `attendance:delete`                |
+| GET                 | `/api/attendance/today`, `/api/attendance/report?range=&departmentId=`                                  | `attendance:view` + sees everyone                      |
+| GET / POST          | `/api/leaves?status=&type=&employeeId=&mine=1`                                                          | `leaves:view` / `leaves:create`                        |
+| GET / DELETE        | `/api/leaves/:id` (DELETE = cancel a pending request)                                                   | `leaves:view` (+ own request or `leaves:delete`)       |
+| POST                | `/api/leaves/:id/decision` `{ decision: "approve" \| "reject", note }`                                  | `leaves:approve` / `leaves:reject`, not your own       |
+| GET / POST          | `/api/leaves/:id/attachment` (multipart `file`)                                                         | `leaves:view` (+ own pending request or `leaves:edit`) |
+
 ## Planned
 
-leads, invoices, payments, expenses, employees, attendance, leaves, payroll, projects, tasks,
-products, suppliers, purchases, inventory, accounting, reports. See `MASTER-ERP-BUILD-PLAN.md`.
+payroll, projects, tasks, products, suppliers, purchases, inventory, reports. See `MASTER-ERP-BUILD-PLAN.md`.

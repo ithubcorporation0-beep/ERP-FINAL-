@@ -1,18 +1,18 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { NotFoundError, ValidationError } from "@/lib/errors";
-import { logger } from "@/lib/logger";
-import { companyKey, getStorage } from "@/lib/storage";
-import {
-  cleanFileName,
-  detectDocumentType,
-  DOCUMENT_TYPES_HINT,
-  MAX_DOCUMENT_BYTES,
-} from "@/lib/storage/documents";
+import { NotFoundError } from "@/lib/errors";
+import { companyKey } from "@/lib/storage";
 import { authorize, type TenantContext } from "@/lib/tenant";
 import { customerDocumentRepository } from "@/server/repositories/customer-document.repository";
 import { writeAuditLog } from "./audit.service";
 import { customerService } from "./customer.service";
+import {
+  checkDocument,
+  deleteStoredQuietly,
+  readStored,
+  storeThenRecord,
+  type UploadedFile,
+} from "./stored-files";
 
 /**
  * Files attached to a customer. Bytes go to file storage under companies/<companyId>/customers/<customerId>/;
@@ -24,26 +24,18 @@ export const customerDocumentService = {
     return customerDocumentRepository.list(ctx.companyId, customerId);
   },
 
-  async upload(ctx: TenantContext, customerId: string, file: { name: string; bytes: Uint8Array }) {
+  async upload(ctx: TenantContext, customerId: string, file: UploadedFile) {
     authorize(ctx, "customers:edit");
     await customerService.get(ctx, customerId);
-    if (file.bytes.byteLength === 0) throw new ValidationError("Choose a file to upload.");
-    if (file.bytes.byteLength > MAX_DOCUMENT_BYTES)
-      throw new ValidationError("Files must be 10 MB or smaller.");
-    const name = cleanFileName(file.name);
-    const type = detectDocumentType(file.bytes, name);
-    if (!type) throw new ValidationError(`Upload a ${DOCUMENT_TYPES_HINT} file.`);
-
+    const { name, type } = checkDocument(file);
     const key = companyKey(
       ctx.companyId,
       "customers",
       customerId,
       `${crypto.randomUUID()}.${type.extension}`,
     );
-    const storage = getStorage();
-    await storage.put(key, file.bytes, type.contentType);
-    try {
-      return await db.$transaction(async (tx) => {
+    return storeThenRecord(key, file.bytes, type.contentType, () =>
+      db.$transaction(async (tx) => {
         const document = await customerDocumentRepository.create(
           ctx.companyId,
           {
@@ -68,13 +60,8 @@ export const customerDocumentService = {
           tx,
         );
         return document;
-      });
-    } catch (error) {
-      await storage
-        .delete(key)
-        .catch((cleanupError: unknown) => logger.warn("Orphaned document file", { key, cleanupError }));
-      throw error;
-    }
+      }),
+    );
   },
 
   /** The file for download. Only documents of this customer in this company are reachable. */
@@ -82,12 +69,7 @@ export const customerDocumentService = {
     await customerService.get(ctx, customerId);
     const document = await customerDocumentRepository.findById(ctx.companyId, customerId, id);
     if (!document) throw new NotFoundError("Document");
-    const body = await getStorage().get(document.storageKey);
-    if (!body) {
-      logger.error("Document file missing from storage", { documentId: id, key: document.storageKey });
-      throw new NotFoundError("Document");
-    }
-    return { document, body };
+    return { document, body: await readStored(document.storageKey, "Document") };
   },
 
   async remove(ctx: TenantContext, customerId: string, id: string) {
@@ -111,10 +93,6 @@ export const customerDocumentService = {
       );
     });
     // The row is gone, so the file is unreachable; a failed cleanup only leaves an orphan, which is logged.
-    await getStorage()
-      .delete(document.storageKey)
-      .catch((error: unknown) =>
-        logger.warn("Could not delete document file", { key: document.storageKey, error }),
-      );
+    await deleteStoredQuietly(document.storageKey);
   },
 };

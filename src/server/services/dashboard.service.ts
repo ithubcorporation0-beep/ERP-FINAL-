@@ -11,20 +11,24 @@ import {
   type KpiId,
 } from "@/config/dashboard";
 import { EXPENSE_CATEGORY_LABELS, expenseCategoryLabel } from "@/config/accounting";
+import { LEAVE_STATUS_LABELS, LEAVE_TYPE_LABELS } from "@/config/hr";
 import { formatRecordNumber } from "@/config/records";
 import { formatMoney } from "@/lib/format";
 import { addMoney, compareMoney, money, subtractMoney, sumMoney } from "@/lib/money";
-import { resolveDateRange, type DateRangePreset, type ResolvedDateRange } from "@/lib/date-range";
+import { addDays, resolveDateRange, type DateRangePreset, type ResolvedDateRange } from "@/lib/date-range";
 import { NotFoundError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { hasAnyPermission, hasPermission, type PermissionKey } from "@/lib/permissions";
 import { authorize, type TenantContext } from "@/lib/tenant";
 import { companyRepository } from "@/server/repositories/company.repository";
 import { customerRepository } from "@/server/repositories/customer.repository";
+import { employeeRepository } from "@/server/repositories/employee.repository";
 import { expenseRepository } from "@/server/repositories/expense.repository";
 import { journalRepository } from "@/server/repositories/journal.repository";
+import { leaveRepository } from "@/server/repositories/leave.repository";
 import { invoiceRepository } from "@/server/repositories/invoice.repository";
 import { paymentRepository } from "@/server/repositories/payment.repository";
+import { attendanceService } from "./attendance.service";
 
 /**
  * Dashboard figures. Every number comes from a database query scoped to the current company; a widget whose
@@ -112,6 +116,16 @@ const kpiProviders: Partial<Record<KpiId, KpiProvider>> = {
     };
   },
 
+  /** Current workforce (probation, active, on notice); "added" = joined in the range. */
+  async totalEmployees({ ctx, range }) {
+    const bounds = calendarBounds(range);
+    const [value, addedInRange] = await Promise.all([
+      employeeRepository.countWorkforce(ctx.companyId),
+      employeeRepository.countWorkforce(ctx.companyId, bounds),
+    ]);
+    return { value: String(value), format: "number", addedInRange };
+  },
+
   /** What customers owe right now on open invoices (not limited to the range). */
   async outstandingInvoices({ ctx }) {
     const { total, paid } = await invoiceRepository.sumOutstanding(ctx.companyId);
@@ -176,6 +190,35 @@ const chartProviders: Partial<Record<ChartId, ChartProvider>> = {
     };
   },
 
+  /** Employee-days per month: present (incl. late and half days), late, absent, on leave — working days only. */
+  async employeeAttendance({ ctx, range, locale }) {
+    const bounds = calendarBounds(range);
+    const months = await attendanceService.monthly(ctx, { from: bounds.from, to: addDays(bounds.to, -1) });
+    const rows = range.months.map((month) => {
+      const totals = months.get(month.key);
+      return {
+        key: month.key,
+        label: monthLabel(month.year, month.month, locale),
+        values: {
+          present: totals?.present ?? 0,
+          late: totals?.late ?? 0,
+          absent: totals?.absent ?? 0,
+          onLeave: totals?.onLeave ?? 0,
+        },
+      };
+    });
+    return {
+      series: [
+        { key: "present", label: "Present", kind: "bar" },
+        { key: "late", label: "Late", kind: "bar" },
+        { key: "absent", label: "Absent", kind: "bar" },
+        { key: "onLeave", label: "On leave", kind: "bar" },
+      ],
+      rows,
+      hasData: rows.some((row) => Object.values(row.values).some((value) => value > 0)),
+    };
+  },
+
   async customerGrowth({ ctx, range, locale, timeZone }) {
     const [before, monthly] = await Promise.all([
       customerRepository.countActive(ctx.companyId, { to: range.from }),
@@ -235,6 +278,31 @@ const activityProviders: Partial<Record<ActivityId, ActivityProvider>> = {
       detail: formatMoney(money(payment.amount), { locale, currency: payment.invoice.currency }) ?? undefined,
       at: payment.createdAt.toISOString(),
     }));
+  },
+
+  /** New employees and leave requests. */
+  async employeeActivity({ ctx }, limit) {
+    const [employees, leaves] = await Promise.all([
+      employeeRepository.listRecent(ctx.companyId, limit),
+      leaveRepository.listRecent(ctx.companyId, limit),
+    ]);
+    return [
+      ...employees.map((employee) => ({
+        id: `employee:${employee.id}`,
+        source: "employeeActivity" as const,
+        title: `${formatRecordNumber("employee", employee.number)} · ${employee.name} joined${
+          employee.position ? ` as ${employee.position}` : ""
+        }`,
+        at: employee.createdAt.toISOString(),
+      })),
+      ...leaves.map((leave) => ({
+        id: `leave:${leave.id}`,
+        source: "employeeActivity" as const,
+        title: `${formatRecordNumber("leave", leave.number)} · ${leave.employee.name}: ${LEAVE_TYPE_LABELS[leave.type]}`,
+        detail: `${leave.days} ${leave.days === 1 ? "day" : "days"} · ${LEAVE_STATUS_LABELS[leave.status]}`,
+        at: leave.createdAt.toISOString(),
+      })),
+    ];
   },
 
   async newCustomers({ ctx }, limit) {

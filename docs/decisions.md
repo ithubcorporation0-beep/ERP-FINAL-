@@ -310,3 +310,28 @@ Expenses post to the ledger only when approved (accrual at the expense date; "No
 Payable). Visibility is a record-level rule in the service: approvers and accountants see all expenses, everyone
 else only their own, enforced in the repository query so lists, detail pages and the API agree. Receipts reuse the
 storage layer with company-prefixed keys.
+
+## ADR-038: Salary and bank details as a restricted, encrypted sub-record (phase 09)
+
+Pay data lives in `employee_compensations`, never selected with the employee profile, behind its own permission
+module (`salaries:view` / `salaries:edit`) so managers can run their team without seeing pay. Bank account numbers
+and IBANs are encrypted with AES-256-GCM using an app key (`DATA_ENCRYPTION_KEY`) and the record identity as
+authenticated data; the last four characters are stored for masking, and full values are returned only by an
+explicit, audited reveal. Salary stays a plain NUMERIC so payroll can aggregate it in SQL; its protection is the
+separate table, the permission and audit redaction. Database-level encryption (pgcrypto) was not used: the key
+would travel in SQL and appear in query logs.
+
+## ADR-039: Attendance rules as pure functions, absences derived on read (phase 09)
+
+Late, early departure and half day are computed by pure, unit-tested functions from the company work schedule in
+its time zone and stored on the record (so a later schedule change doesn't rewrite history). Check-in uses the
+server clock only. Absent and on-leave days are derived when reports are read (working day, employed, no record,
+approved leave) instead of being written by a nightly job, so there is no scheduler to run and nothing to go stale.
+GPS, device/IP restrictions and biometrics are documented future options, not partial implementations.
+
+## ADR-040: Leave approval with overlap check under a row lock and no self-approval (phase 09)
+
+A leave request counts working days from the schedule, may not overlap the employee's pending or approved leave
+(checked inside a transaction holding `SELECT … FOR UPDATE` on the employee row, so concurrent requests
+serialize), and can't be approved or rejected by the person it belongs to. An exclusion constraint (btree_gist)
+would also work but needs a Postgres extension that some hosts don't enable.

@@ -1,15 +1,14 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { AccessDenied } from "@/components/shared/access-denied";
-import { ModulePlaceholder } from "@/components/shared/module-placeholder";
-import { getNavItem } from "@/config/navigation";
 import { authorizePage } from "@/lib/auth/page";
+import { can } from "@/lib/tenant";
 
-export const metadata: Metadata = { title: "HR" };
-
-const HREF = "/hr";
-
+/** /hr opens the part of HR the user may see. */
 export default async function HRPage() {
-  // Server-side check: hiding the menu link is not protection.
-  if (!(await authorizePage(getNavItem(HREF).permission))) return <AccessDenied />;
-  return <ModulePlaceholder href={HREF} />;
+  const ctx = await authorizePage();
+  if (!ctx) return <AccessDenied />;
+  if (can(ctx, "employees:view")) redirect("/hr/employees");
+  if (can(ctx, "attendance:view")) redirect("/hr/attendance");
+  if (can(ctx, "leaves:view")) redirect("/hr/leave");
+  return <AccessDenied />;
 }

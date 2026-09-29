@@ -21,6 +21,7 @@ import {
   PAID_METHODS,
   TRANSACTION_TYPES,
 } from "@/config/accounting";
+import { EMPLOYMENT_STATUSES, EXIT_STATUSES, LEAVE_STATUSES, LEAVE_TYPES } from "@/config/hr";
 import { DATE_RANGE_PRESETS, DEFAULT_DATE_RANGE } from "@/lib/date-range";
 import { isCountryCode, isCurrencyCode, isLocale, isTimeZone } from "@/lib/intl";
 
@@ -327,6 +328,181 @@ export const reportQuerySchema = z.object({
   asOf: isoDate.optional().catch(undefined),
 });
 
+// ─── HR ───
+
+const optionalId = z.union([z.literal(""), idSchema]).optional();
+/** "HH:MM", 24-hour clock (company time zone). */
+const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a 24-hour time like 09:00.");
+
+export const departmentSchema = z.object({
+  name: z.string().trim().min(2, "Enter a name.").max(100),
+  description: optionalText(500),
+  isActive: z.boolean().optional(),
+});
+
+/** Employee profile. Salary and bank details are a separate, restricted form (compensationSchema). */
+export const employeeSchema = z.object({
+  name: z.string().trim().min(2, "Enter the employee's name.").max(200),
+  email: optionalEmail,
+  phone: optionalPhone,
+  identificationNumber: z
+    .string()
+    .trim()
+    .max(50, "Use at most 50 characters.")
+    .regex(/^[A-Za-z0-9 -]*$/, "Use letters, digits, spaces and dashes only.")
+    .optional(),
+  departmentId: optionalId,
+  position: optionalText(120),
+  joiningDate: isoDate,
+  /** The member who uses this record for self-service attendance and leave; "" = none. */
+  userId: optionalId,
+  emergencyContactName: optionalText(200),
+  emergencyContactRelation: optionalText(100),
+  emergencyContactPhone: optionalPhone,
+  notes: optionalText(5000),
+  /** Only when creating; later changes go through the status workflow. */
+  status: z.enum(["PROBATION", "ACTIVE"]).optional(),
+});
+
+export const employeeStatusSchema = z
+  .object({
+    status: z.enum(EMPLOYMENT_STATUSES),
+    exitDate: z.union([z.literal(""), isoDate]).optional(),
+    note: optionalText(1000),
+  })
+  .refine((value) => !EXIT_STATUSES.includes(value.status) || Boolean(value.exitDate), {
+    path: ["exitDate"],
+    message: "Enter the last working day.",
+  });
+
+/**
+ * Salary and bank details. Account number / IBAN: leave empty to keep the stored value, or set `remove…` to clear
+ * it — the stored values are never sent back to the form.
+ */
+export const compensationSchema = z.object({
+  salary: z.union([z.literal(""), decimalText(2, "Enter an amount like 85000 or 85000.50.")]),
+  bankName: optionalText(120),
+  accountTitle: optionalText(120),
+  accountNumber: z
+    .union([
+      z.literal(""),
+      z
+        .string()
+        .trim()
+        .regex(/^[A-Za-z0-9 -]{4,34}$/, "Use 4 to 34 letters, digits, spaces or dashes."),
+    ])
+    .optional(),
+  iban: z
+    .union([
+      z.literal(""),
+      z
+        .string()
+        .trim()
+        .transform((value) => value.replace(/\s+/g, "").toUpperCase())
+        .pipe(
+          z
+            .string()
+            .regex(/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/, "Enter a valid IBAN, e.g. PK36SCBL0000001123456702."),
+        ),
+    ])
+    .optional(),
+  removeAccountNumber: z.boolean().optional(),
+  removeIban: z.boolean().optional(),
+});
+
+export const employeeListQuerySchema = paginationSchema.extend({
+  status: z
+    .enum([...EMPLOYMENT_STATUSES, "current"])
+    .optional()
+    .catch(undefined),
+  departmentId: idSchema.optional().catch(undefined),
+});
+
+/** HR enters or corrects a day: times are "HH:MM" in the company time zone, or the day is marked absent. */
+export const attendanceEntrySchema = z
+  .object({
+    employeeId: idSchema,
+    date: isoDate,
+    absent: z.boolean(),
+    checkIn: z.union([z.literal(""), clockTime]),
+    checkOut: z.union([z.literal(""), clockTime]),
+    note: optionalText(500),
+  })
+  .superRefine((value, context) => {
+    if (value.absent) return;
+    if (!value.checkIn)
+      context.addIssue({ code: "custom", path: ["checkIn"], message: "Enter the check-in time." });
+    if (value.checkIn && value.checkOut && value.checkOut < value.checkIn) {
+      context.addIssue({ code: "custom", path: ["checkOut"], message: "Can't be before the check-in." });
+    }
+  });
+
+export const attendanceListQuerySchema = paginationSchema.extend({
+  employeeId: idSchema.optional().catch(undefined),
+  range: z.enum(DATE_RANGE_PRESETS).catch("this-month"),
+});
+
+/** `?employeeId=&date=` prefill of the attendance entry form (ignored when invalid). */
+export const attendancePrefillSchema = z.object({
+  employeeId: idSchema.optional().catch(undefined),
+  date: isoDate.optional().catch(undefined),
+});
+
+export const attendanceReportQuerySchema = z.object({
+  range: z.enum(DATE_RANGE_PRESETS).catch("this-month"),
+  departmentId: idSchema.optional().catch(undefined),
+});
+
+export const leaveSchema = z
+  .object({
+    /** The employee on leave; "" = yourself. Only HR may file for someone else. */
+    employeeId: optionalId,
+    type: z.enum(LEAVE_TYPES),
+    startDate: isoDate,
+    endDate: isoDate,
+    reason: z.string().trim().min(3, "Give a short reason.").max(2000),
+  })
+  .refine((value) => value.endDate >= value.startDate, {
+    path: ["endDate"],
+    message: "Can't be before the start date.",
+  });
+
+export const leaveListQuerySchema = paginationSchema.extend({
+  employeeId: idSchema.optional().catch(undefined),
+  status: listFilter(LEAVE_STATUSES),
+  type: listFilter(LEAVE_TYPES),
+  mine: z.enum(["1"]).optional().catch(undefined),
+});
+
+export const leaveDecisionSchema = z.object({ id: idSchema, note: optionalText(1000) });
+export const leaveRejectSchema = z.object({
+  id: idSchema,
+  note: z.string().trim().min(3, "Say why the request is rejected.").max(1000),
+});
+
+/** API body for deciding a leave request. */
+export const leaveDecisionRequestSchema = z.discriminatedUnion("decision", [
+  z.object({ decision: z.literal("approve"), note: optionalText(1000) }),
+  z.object({
+    decision: z.literal("reject"),
+    note: z.string().trim().min(3, "Say why the request is rejected.").max(1000),
+  }),
+]);
+
+/** Company work schedule (settings hr.*), edited on the Settings page. */
+export const workScheduleSchema = z
+  .object({
+    workdayStart: clockTime,
+    workdayEnd: clockTime,
+    lateGraceMinutes: z.number().int().min(0, "Use 0 to 240 minutes.").max(240, "Use 0 to 240 minutes."),
+    halfDayMinutes: z.number().int().min(0, "Use 0 to 720 minutes.").max(720, "Use 0 to 720 minutes."),
+    workDays: z.array(z.number().int().min(0).max(6)).min(1, "Choose at least one working day."),
+  })
+  .refine((value) => value.workdayEnd > value.workdayStart, {
+    path: ["workdayEnd"],
+    message: "Must be after the start (overnight shifts aren't supported).",
+  });
+
 export const loginSchema = z.object({
   email: z.email("Enter a valid email address.").toLowerCase(),
   password: z.string().min(1, "Enter your password.").max(200),
@@ -456,6 +632,17 @@ export type PaymentInput = z.infer<typeof paymentSchema>;
 export type PaymentListQuery = z.infer<typeof paymentListQuerySchema>;
 export type SendDocumentInput = z.infer<typeof sendDocumentSchema>;
 export type ExpenseInput = z.infer<typeof expenseSchema>;
+export type DepartmentInput = z.infer<typeof departmentSchema>;
+export type EmployeeInput = z.infer<typeof employeeSchema>;
+export type EmployeeStatusInput = z.infer<typeof employeeStatusSchema>;
+export type CompensationInput = z.input<typeof compensationSchema>;
+export type CompensationData = z.output<typeof compensationSchema>;
+export type EmployeeListQuery = z.infer<typeof employeeListQuerySchema>;
+export type AttendanceEntryInput = z.infer<typeof attendanceEntrySchema>;
+export type AttendanceListQuery = z.infer<typeof attendanceListQuerySchema>;
+export type LeaveInput = z.infer<typeof leaveSchema>;
+export type LeaveListQuery = z.infer<typeof leaveListQuerySchema>;
+export type WorkScheduleInput = z.infer<typeof workScheduleSchema>;
 export type ExpenseListQuery = z.infer<typeof expenseListQuerySchema>;
 export type AccountInput = z.infer<typeof accountSchema>;
 export type JournalEntryInput = z.infer<typeof journalEntrySchema>;

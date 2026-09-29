@@ -1,7 +1,7 @@
 import "server-only";
 import { formatRecordNumber } from "@/config/records";
 import { MAX_MONEY } from "@/config/sales";
-import { todayInZone } from "@/lib/date-range";
+import { resolveDateRange, todayInZone, type DateRangePreset } from "@/lib/date-range";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { countryName, formatCalendarDate, formatMoney } from "@/lib/format";
 import { calculateLine, calculateTotals, compareMoney, money } from "@/lib/money";
@@ -11,6 +11,7 @@ import type { LineItemInput } from "@/lib/validation";
 import { companyRepository } from "@/server/repositories/company.repository";
 import { customerRepository } from "@/server/repositories/customer.repository";
 import type { DbClient } from "@/server/repositories/helpers";
+import type { DateBounds } from "@/server/repositories/journal.repository";
 import type { PricedItem } from "@/server/repositories/sales-items";
 
 /**
@@ -61,6 +62,25 @@ export async function salesContext(ctx: TenantContext) {
 }
 
 export type SalesContext = Awaited<ReturnType<typeof salesContext>>;
+
+/** Calendar bounds of a period preset in the company's time zone and fiscal year ("YYYY-MM-DD", end exclusive). */
+export async function periodBounds(
+  ctx: TenantContext,
+  preset: DateRangePreset,
+): Promise<Required<DateBounds> & { label: string }> {
+  const { company, timeZone } = await salesContext(ctx);
+  const range = resolveDateRange(preset, { timeZone, fiscalYearStartMonth: company.fiscalYearStartMonth });
+  const first = range.months[0];
+  const last = range.months.at(-1);
+  if (!first || !last) throw new Error("Empty period");
+  const next =
+    last.month === 12 ? { year: last.year + 1, month: 1 } : { year: last.year, month: last.month + 1 };
+  return {
+    from: `${first.key}-01`,
+    to: `${next.year}-${String(next.month).padStart(2, "0")}-01`,
+    label: `${first.key} to ${last.key}`,
+  };
+}
 
 /** Items as returned by the repositories, back to form input (exact strings). */
 export function itemsToInput(

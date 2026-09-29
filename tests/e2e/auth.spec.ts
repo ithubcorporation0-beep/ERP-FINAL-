@@ -121,7 +121,7 @@ test.describe("the Super Admin", () => {
     await expect(page.getByRole("button", { name: "Invite user" })).toBeVisible();
 
     await page.goto("/roles");
-    await page.getByRole("link", { name: "Employee" }).click();
+    await page.getByRole("link", { name: "Employee", exact: true }).click();
     await expect(page.getByText("Built-in roles can't be changed")).toBeVisible();
     await page.getByRole("link", { name: "Duplicate" }).click();
 

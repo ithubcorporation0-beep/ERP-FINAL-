@@ -24,9 +24,8 @@ import { expenseRepository } from "@/server/repositories/expense.repository";
 import { invoiceRepository } from "@/server/repositories/invoice.repository";
 import { journalRepository } from "@/server/repositories/journal.repository";
 import { paymentRepository } from "@/server/repositories/payment.repository";
-import { periodBounds } from "./accounting.service";
 import { ledgerService } from "./ledger.service";
-import { salesContext } from "./sales-shared";
+import { periodBounds, salesContext } from "./sales-shared";
 
 /**
  * Financial reports. Profit & Loss, Balance Sheet and Cash Flow are computed from the ledger (journal lines);

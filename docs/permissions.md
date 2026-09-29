@@ -41,7 +41,7 @@ permissions (global)  ◄── role_permissions (company_id) ──►  roles (
 - A **permission** is a key `module:action`, e.g. `invoices:create`. All keys are listed explicitly in
   `PERMISSION_KEYS` (`src/lib/permissions/index.ts`) — these are the **permission constants**; TypeScript rejects
   any key that doesn't exist.
-- The seed syncs the list into the `permissions` table (currently **101** keys), deleting retired keys.
+- The seed syncs the list into the `permissions` table (currently **108** keys), deleting retired keys.
 - **Roles belong to one company**; their permissions are rows in `role_permissions`.
 - A user's **membership** in a company points to exactly one role of that company (enforced by composite
   foreign keys).
@@ -70,11 +70,11 @@ Refreshed from code by `npm run db:seed`.
 
 | Role        | Access                                                                                                                                   |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Super Admin | Everything (101 permissions). The company always keeps at least one active Super Admin                                                   |
+| Super Admin | Everything (108 permissions). The company always keeps at least one active Super Admin                                                   |
 | Admin       | Everything except `roles:manage` and `settings:manage` — runs users and all modules                                                      |
 | Manager     | Dashboard, customers & leads, invoices (no delete), projects & tasks, approves attendance/leave/expenses/purchases, reports, views users |
 | Accountant  | Dashboard, invoices, payments, expenses, accounting; views customers, suppliers, purchases, payroll; reports                             |
-| HR Manager  | Dashboard, employees, attendance, leaves, payroll (incl. approve/reject); reports; views users                                           |
+| HR Manager  | Dashboard, employees, **salary & bank details**, attendance, leaves, payroll (incl. approve/reject); reports; views users                |
 | Employee    | Dashboard; views & creates own attendance, leave and expense requests; views projects; views & edits tasks                               |
 | Customer    | No internal permissions — lands on their profile. The customer portal arrives in phase 15                                                |
 
@@ -170,6 +170,27 @@ for or by themselves (lists, detail pages and the API — another person's expen
 for themselves, and may edit or delete their own expense while it is pending or rejected (with
 `expenses:create`). Approved expenses can't be changed by anyone. The expense page's "Accounting" section is shown
 only with `accounting:view`.
+
+## HR
+
+| Action                                                                         | Permission                              | Built-in roles (besides Super Admin / Admin) |
+| ------------------------------------------------------------------------------ | --------------------------------------- | -------------------------------------------- |
+| See employees, departments, documents, everyone's attendance and leave         | `employees:view`                        | Manager, HR Manager                          |
+| Add / edit (incl. status, photo, documents) / delete employees and departments | `employees:create` / `edit` / `delete`  | HR Manager                                   |
+| See salary and masked bank details; reveal full numbers (audited)              | `salaries:view`                         | HR Manager                                   |
+| Change salary and bank details                                                 | `salaries:edit`                         | HR Manager                                   |
+| Check in / out for yourself                                                    | `attendance:create`                     | Employee, HR Manager                         |
+| See your own attendance                                                        | `attendance:view`                       | Employee, Manager, HR Manager                |
+| Enter or correct anyone's attendance / delete records                          | `attendance:edit` / `attendance:delete` | HR Manager                                   |
+| Request leave for yourself / for anyone                                        | `leaves:create` / `leaves:edit`         | Employee, HR Manager / HR Manager            |
+| Approve / reject leave (never your own request)                                | `leaves:approve` / `leaves:reject`      | Manager, HR Manager                          |
+| Cancel anyone's pending leave request                                          | `leaves:delete`                         | HR Manager                                   |
+
+**Record-level rules:** people without `employees:view` (or, for attendance, `attendance:edit` /
+`attendance:approve`; for leave, `leaves:approve` / `leaves:edit`) see only their **own** attendance and leave —
+another person's record is "not found", in pages and the API. Self-service needs the login to be linked to an
+employee record. Salary and bank details are never part of employee responses; see `docs/hr.md`.
+`salaries:*` is new in phase 09 — run `npm run db:seed` after deploying.
 
 ## Dashboard widgets
 

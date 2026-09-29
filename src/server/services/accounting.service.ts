@@ -1,7 +1,7 @@
 import "server-only";
 import { formatRecordNumber } from "@/config/records";
 import { normalBalance } from "@/lib/accounting";
-import { resolveDateRange, type DateRangePreset } from "@/lib/date-range";
+import type { DateRangePreset } from "@/lib/date-range";
 import { db } from "@/lib/db";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import { fromCents, money, toCents } from "@/lib/money";
@@ -11,32 +11,13 @@ import { accountRepository } from "@/server/repositories/account.repository";
 import { journalRepository, type DateBounds } from "@/server/repositories/journal.repository";
 import { writeAuditLog } from "./audit.service";
 import { ledgerService } from "./ledger.service";
-import { salesContext } from "./sales-shared";
+import { periodBounds, salesContext } from "./sales-shared";
 
 /**
  * Chart of accounts and transactions (journal entries). Reading needs `accounting:view`; creating accounts and
  * manual transactions `accounting:create`; editing accounts `accounting:edit`; deleting accounts and reversing
  * transactions `accounting:delete`. Automatic postings come from ledger.service.ts.
  */
-
-/** Calendar bounds of a period preset in the company's time zone and fiscal year ("YYYY-MM-DD", end exclusive). */
-export async function periodBounds(
-  ctx: TenantContext,
-  preset: DateRangePreset,
-): Promise<Required<DateBounds> & { label: string }> {
-  const { company, timeZone } = await salesContext(ctx);
-  const range = resolveDateRange(preset, { timeZone, fiscalYearStartMonth: company.fiscalYearStartMonth });
-  const first = range.months[0];
-  const last = range.months.at(-1);
-  if (!first || !last) throw new Error("Empty period");
-  const next =
-    last.month === 12 ? { year: last.year + 1, month: 1 } : { year: last.year, month: last.month + 1 };
-  return {
-    from: `${first.key}-01`,
-    to: `${next.year}-${String(next.month).padStart(2, "0")}-01`,
-    label: `${first.key} to ${last.key}`,
-  };
-}
 
 export const accountingService = {
   /** All accounts with their all-time balance on their normal side. */

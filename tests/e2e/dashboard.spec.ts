@@ -27,7 +27,7 @@ test("Super Admin sees every widget; modules not built yet say so instead of sho
   for (const label of ["Total revenue", "Net profit", "Total customers", "Low stock items"]) {
     await expect(figures(page).getByText(label, { exact: true })).toBeVisible();
   }
-  await expect(figures(page).getByText(/Not tracked yet/)).toHaveCount(4);
+  await expect(figures(page).getByText(/Not tracked yet/)).toHaveCount(3);
   await expect(page.getByRole("heading", { name: "Customer growth" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Revenue vs expenses" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Recent activity" })).toBeVisible();
@@ -39,7 +39,8 @@ test("Super Admin sees every widget; modules not built yet say so instead of sho
     "href",
     "/finance/expenses/new",
   );
-  await expect(page.getByRole("button", { name: /Add employee/ })).toBeDisabled();
+  await expect(page.getByRole("link", { name: /Add employee/ })).toHaveAttribute("href", "/hr/employees/new");
+  await expect(page.getByRole("button", { name: /Create project/ })).toBeDisabled();
 });
 
 test("date filter is kept in the URL and reloads the figures", async ({ browser }) => {
@@ -48,11 +49,19 @@ test("date filter is kept in the URL and reloads the figures", async ({ browser 
   await page.getByRole("combobox", { name: "Date range" }).click();
   await page.getByRole("option", { name: "Last 12 months" }).click();
   await expect(page).toHaveURL(/range=last-12-months/);
-  await expect(figures(page).getByText(/new · last 12 months/)).toBeVisible();
+  await expect(
+    figures(page)
+      .getByText(/new · last 12 months/)
+      .first(),
+  ).toBeVisible();
 
   // An invalid value from a hand-edited URL falls back to the default instead of failing.
   await page.goto("/dashboard?range=forever");
-  await expect(figures(page).getByText(/new · last 6 months/)).toBeVisible();
+  await expect(
+    figures(page)
+      .getByText(/new · last 6 months/)
+      .first(),
+  ).toBeVisible();
 });
 
 test("a new customer shows up in the figures and the activity feed", async ({ browser }) => {

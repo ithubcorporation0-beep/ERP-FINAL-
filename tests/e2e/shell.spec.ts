@@ -64,8 +64,8 @@ test.describe("mobile", () => {
 
     await page.getByRole("button", { name: "Open navigation menu" }).click();
     const sheet = page.getByRole("dialog");
-    await sheet.getByRole("link", { name: "HR" }).click();
-    await expect(page).toHaveURL(/\/hr$/);
+    await sheet.getByRole("link", { name: "Employees" }).click();
+    await expect(page).toHaveURL(/\/hr\/employees$/);
     await expect(sheet).toBeHidden();
 
     const overflow = await page.evaluate(

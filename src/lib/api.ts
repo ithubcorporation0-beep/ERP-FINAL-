@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { unstable_rethrow } from "next/navigation";
-import { NotFoundError, toAppError, type ErrorCode } from "@/lib/errors";
+import { NotFoundError, toAppError, ValidationError, type ErrorCode } from "@/lib/errors";
+import { attachmentHeader } from "@/lib/storage/documents";
 import { idSchema } from "@/lib/validation";
 import { logger } from "@/lib/logger";
 
@@ -43,4 +44,36 @@ export function routeId(value: string, entity: string): string {
   const parsed = idSchema.safeParse(value);
   if (!parsed.success) throw new NotFoundError(entity);
   return parsed.data;
+}
+
+/**
+ * The `file` field of a multipart upload. Refuses obviously oversized bodies before reading them into memory;
+ * the service still validates the real type and size.
+ */
+export async function readUpload(
+  request: Request,
+  maxBytes: number,
+  tooLarge: string,
+): Promise<{ name: string; bytes: Uint8Array }> {
+  if (Number(request.headers.get("content-length") ?? 0) > maxBytes + 64 * 1024) {
+    throw new ValidationError(tooLarge);
+  }
+  const file = (await request.formData()).get("file");
+  if (!(file instanceof File)) throw new ValidationError("Choose a file to upload.");
+  if (file.size > maxBytes) throw new ValidationError(tooLarge);
+  return { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) };
+}
+
+/** A stored file as a download that can never run in the app's origin (no inline rendering, sandboxed). */
+export function fileDownload(body: Uint8Array, name: string, contentType: string): NextResponse {
+  return new NextResponse(new Uint8Array(body), {
+    headers: {
+      "Content-Type": contentType,
+      "Content-Length": String(body.byteLength),
+      "Content-Disposition": attachmentHeader(name),
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'; sandbox",
+    },
+  });
 }

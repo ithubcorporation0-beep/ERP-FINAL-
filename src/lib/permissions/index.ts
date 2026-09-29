@@ -68,6 +68,9 @@ export const PERMISSION_KEYS = [
   "leaves:approve",
   "leaves:reject",
 
+  "salaries:view",
+  "salaries:edit",
+
   "payroll:view",
   "payroll:create",
   "payroll:edit",
@@ -164,6 +167,7 @@ export const MODULE_LABELS: Record<Module, string> = {
   employees: "Employees",
   attendance: "Attendance",
   leaves: "Leave",
+  salaries: "Salary & bank details",
   payroll: "Payroll",
   projects: "Projects",
   tasks: "Tasks",
@@ -322,6 +326,7 @@ export const DEFAULT_ROLES: Record<string, DefaultRole> = {
     permissions: [
       "dashboard:view",
       "employees:*",
+      "salaries:*",
       "attendance:*",
       "leaves:*",
       "payroll:*",

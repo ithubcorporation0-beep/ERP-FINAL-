@@ -212,6 +212,20 @@ Details and the exact posting rules: `docs/accounting.md`.
 | Pure rules (shared, tested) | `src/lib/accounting.ts` (`checkEntry`, `normalBalance`, aging); vocabulary in `src/config/accounting.ts`               |
 | Pages                       | `/finance/expenses`, `/finance/accounts`, `/finance/transactions`, `/finance/reports`                                  |
 
+## HR (employees, attendance, leave)
+
+Rules, security and limitations: `docs/hr.md`.
+
+| Piece                   | Where                                                                                                                                      |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Employees, departments  | `employee.service.ts` (`EMP-0001`, status workflow, photo), `department.service.ts`, `employee-document.service.ts`                        |
+| Salary and bank details | `compensation.service.ts` (`salaries:*`), encryption in `src/lib/crypto/field-encryption.ts`                                               |
+| Attendance              | `attendance.service.ts`: check-in/out (server time), HR entries, today's dashboard, reports                                                |
+| Leave                   | `leave.service.ts` (`LV-0001`): request, overlap check under a row lock, approve / reject, cancel, attachment                              |
+| Pure rules (tested)     | `src/lib/attendance.ts` (late, early, half day, day status, working days); vocabulary in `src/config/hr.ts`                                |
+| Uploads                 | `stored-files.ts` (shared by customer documents, employee documents, leave attachments); `readUpload` / `fileDownload` in `src/lib/api.ts` |
+| Pages                   | `/hr/employees`, `/hr/departments`, `/hr/attendance` (+ `/new`, `/report`), `/hr/leave`; work schedule on `/settings`                      |
+
 ## Backend conventions
 
 ### Authentication and authorization

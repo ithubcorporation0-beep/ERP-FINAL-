@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, FileText, HandCoins, Plus, Receipt, ReceiptText } from "lucide-react";
+import { ArrowLeftRight, CalendarDays, FileText, HandCoins, Plus, Receipt, ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
@@ -56,7 +56,7 @@ interface ListConfig {
     description: string;
     createHref?: string;
     createLabel?: string;
-    icon: "quote" | "invoice" | "payment" | "expense" | "journal";
+    icon: "quote" | "invoice" | "payment" | "expense" | "journal" | "leave";
   };
 }
 
@@ -66,6 +66,7 @@ const ICONS = {
   payment: HandCoins,
   expense: Receipt,
   journal: ArrowLeftRight,
+  leave: CalendarDays,
 } as const;
 const ALL = "all";
 const col = createDataTableColumns<SalesRow>();
@@ -78,7 +79,10 @@ interface SalesListProps {
   pageSize: number;
 }
 
-/** List with search, one filter, pagination and loading/empty states — shared by quotations, orders, invoices, payments. */
+/**
+ * List with search, one filter, pagination and loading/empty states — shared by quotations, orders, invoices,
+ * payments, expenses, transactions and leave requests.
+ */
 export function SalesList({ config, rows, total, page, pageSize }: SalesListProps) {
   const router = useRouter();
   const query = useUrlQuery();

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CompanyProfileForm } from "@/features/settings/company-profile-form";
 import { LogoUploader } from "@/features/settings/logo-uploader";
 import { PreferencesForm } from "@/features/settings/preferences-form";
+import { WorkScheduleForm } from "@/features/settings/work-schedule-form";
 import { authorizePage } from "@/lib/auth/page";
 import { MONTH_OPTIONS, countryOptions, currencyOptions, localeOptions, timeZoneOptions } from "@/lib/intl";
 import { can } from "@/lib/tenant";
@@ -96,6 +97,28 @@ export default async function SettingsPage() {
               paymentTermsDays: settings["sales.paymentTermsDays"],
               quotationValidityDays: settings["sales.quotationValidityDays"],
               documentTerms: settings["sales.documentTerms"],
+            }}
+          />
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-xs">
+        <CardHeader>
+          <CardTitle>Work schedule</CardTitle>
+          <CardDescription>
+            Used for attendance (late arrival, early departure, half day, absences) and to count leave days.
+            Times are in the company time zone ({company.timezone}).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <WorkScheduleForm
+            readOnly={readOnly}
+            defaults={{
+              workdayStart: settings["hr.workdayStart"],
+              workdayEnd: settings["hr.workdayEnd"],
+              lateGraceMinutes: settings["hr.lateGraceMinutes"],
+              halfDayMinutes: settings["hr.halfDayMinutes"],
+              workDays: settings["hr.workDays"],
             }}
           />
         </CardContent>

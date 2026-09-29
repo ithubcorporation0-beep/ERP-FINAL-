@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
 import { handle } from "@/lib/api";
 import { requirePermission } from "@/lib/tenant";
+import { leaveListQuerySchema, leaveSchema } from "@/lib/validation";
+import { leaveService } from "@/server/services/leave.service";
 
-// TODO: implement following the customers module (repository → service → route).
-export const GET = handle(async () => {
-  await requirePermission("leaves:view");
-  return NextResponse.json({ error: "Not implemented" }, { status: 501 });
+/** Leave requests. People without approval rights only ever get their own (enforced in the service). */
+export const GET = handle(async (req: Request) => {
+  const ctx = await requirePermission("leaves:view");
+  const query = leaveListQuerySchema.parse(Object.fromEntries(new URL(req.url).searchParams));
+  return NextResponse.json(await leaveService.list(ctx, query));
+});
+
+export const POST = handle(async (req: Request) => {
+  const ctx = await requirePermission("leaves:create");
+  return NextResponse.json(await leaveService.create(ctx, leaveSchema.parse(await req.json())), {
+    status: 201,
+  });
 });
