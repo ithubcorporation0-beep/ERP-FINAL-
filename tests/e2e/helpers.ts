@@ -3,9 +3,28 @@ import { E2E_USERS } from "./users";
 
 /** Shared steps for e2e specs. */
 
+/**
+ * Picks an option of a select. Retries opening it: in dev mode a freshly compiled page can take a moment to hydrate,
+ * and a click before that does nothing.
+ */
 export async function choose(page: Page, label: string | RegExp, option: string | RegExp) {
-  await page.getByRole("combobox", { name: label }).click();
-  await page.getByRole("option", { name: option }).first().click();
+  const combobox = page.getByRole("combobox", { name: label });
+  const item = page.getByRole("option", { name: option }).first();
+  await expect(async () => {
+    if (!(await item.isVisible())) await combobox.click();
+    await expect(item).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
+  await item.click();
+}
+
+/** Clicks a button that opens a dialog, retrying until the dialog is open (see `choose`). */
+export async function openDialog(page: Page, button: string | RegExp) {
+  await expect(async () => {
+    if (!(await page.getByRole("dialog").isVisible())) {
+      await page.getByRole("button", { name: button }).click();
+    }
+    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
 }
 
 export function isoDay(offset: number): string {

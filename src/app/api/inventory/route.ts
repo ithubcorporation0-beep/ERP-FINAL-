@@ -1,9 +1,22 @@
 import { NextResponse } from "next/server";
 import { handle } from "@/lib/api";
-import { requirePermission } from "@/lib/tenant";
+import { requirePermission, requireTenant } from "@/lib/tenant";
+import { stockMovementListQuerySchema, stockOperationSchema } from "@/lib/validation";
+import { stockService } from "@/server/services/stock.service";
 
-// TODO: implement following the customers module (repository → service → route).
-export const GET = handle(async () => {
-  await requirePermission("inventory:view");
-  return NextResponse.json({ error: "Not implemented" }, { status: 501 });
+/** Inventory history: stock movements, newest first (`?productId=&warehouseId=&type=`). */
+export const GET = handle(async (req: Request) => {
+  const ctx = await requirePermission("inventory:view");
+  const query = stockMovementListQuerySchema.parse(Object.fromEntries(new URL(req.url).searchParams));
+  return NextResponse.json(await stockService.list(ctx, query));
+});
+
+/**
+ * Records a stock operation `{ operation: IN | OUT | ADJUST | TRANSFER, … }` — `inventory:create`, or
+ * `inventory:edit` for adjustments (checked in the service, which knows the operation).
+ */
+export const POST = handle(async (req: Request) => {
+  const ctx = await requireTenant();
+  const movements = await stockService.record(ctx, stockOperationSchema.parse(await req.json()));
+  return NextResponse.json(movements, { status: 201 });
 });

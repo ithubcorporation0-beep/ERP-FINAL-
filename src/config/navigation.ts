@@ -24,6 +24,14 @@ export type NavIconName =
   | "tasks"
   | "board"
   | "inventory"
+  | "movements"
+  | "warehouses"
+  | "categories"
+  | "suppliers"
+  | "requests"
+  | "purchaseOrders"
+  | "bills"
+  | "supplierPayments"
   | "reports"
   | "users"
   | "roles"
@@ -232,12 +240,85 @@ export const NAV_SECTIONS: NavSection[] = [
         permission: "projects:view",
         description: "Progress, deadlines and open work per person across projects.",
       },
+    ],
+  },
+  {
+    title: "Inventory",
+    items: [
       {
-        label: "Inventory",
+        label: "Products & stock",
         href: "/inventory",
         icon: "inventory",
+        permission: "products:view",
+        description: "Products with SKU, prices, current stock and low-stock alerts.",
+      },
+      {
+        label: "Stock movements",
+        href: "/inventory/movements",
+        icon: "movements",
         permission: "inventory:view",
-        description: "Products, stock levels, suppliers and purchase orders.",
+        description: "Inventory history: stock in, stock out, adjustments, transfers and goods received.",
+      },
+      {
+        label: "Warehouses",
+        href: "/inventory/warehouses",
+        icon: "warehouses",
+        permission: "inventory:view",
+        description: "Where stock is kept.",
+      },
+      {
+        label: "Categories",
+        href: "/inventory/categories",
+        icon: "categories",
+        permission: "products:view",
+        description: "Product categories.",
+      },
+      {
+        label: "Inventory reports",
+        href: "/inventory/reports",
+        icon: "statements",
+        permission: "products:view",
+        description: "Stock value at purchase price and products below their minimum stock.",
+      },
+    ],
+  },
+  {
+    title: "Purchasing",
+    items: [
+      {
+        label: "Suppliers",
+        href: "/purchasing/suppliers",
+        icon: "suppliers",
+        permission: "suppliers:view",
+        description: "Suppliers with contact and tax details, products, purchases and payments.",
+      },
+      {
+        label: "Purchase requests",
+        href: "/purchasing/requests",
+        icon: "requests",
+        permission: "purchases:view",
+        description: "Requests to buy products, approved before they are ordered.",
+      },
+      {
+        label: "Purchase orders",
+        href: "/purchasing/orders",
+        icon: "purchaseOrders",
+        permission: "purchases:view",
+        description: "Orders to suppliers and the goods received against them.",
+      },
+      {
+        label: "Supplier invoices",
+        href: "/purchasing/bills",
+        icon: "bills",
+        permission: "purchases:view",
+        description: "Bills from suppliers, posted to Accounts Payable.",
+      },
+      {
+        label: "Supplier payments",
+        href: "/purchasing/payments",
+        icon: "supplierPayments",
+        permission: "purchases:view",
+        description: "Money paid to suppliers against their bills.",
       },
     ],
   },

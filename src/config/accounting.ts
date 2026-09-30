@@ -103,6 +103,7 @@ export type SystemAccountKey =
   | "equity"
   | "revenue"
   | "other_income"
+  | "purchases"
   | "expense_rent"
   | "expense_utilities"
   | "expense_salaries"
@@ -169,7 +170,7 @@ export const DEFAULT_ACCOUNTS: readonly DefaultAccount[] = [
     name: "Accounts Payable",
     type: "LIABILITY",
     systemKey: "payable",
-    description: "What the company owes vendors for unpaid expenses.",
+    description: "What the company owes vendors: unpaid expenses and supplier invoices.",
   },
   {
     code: "2100",
@@ -205,6 +206,13 @@ export const DEFAULT_ACCOUNTS: readonly DefaultAccount[] = [
     type: "REVENUE",
     systemKey: "other_income",
     description: "Income that isn't from invoiced sales.",
+  },
+  {
+    code: "5000",
+    name: "Purchases",
+    type: "EXPENSE",
+    systemKey: "purchases",
+    description: "Goods bought from suppliers (supplier invoices), expensed when billed.",
   },
   ...EXPENSE_CATEGORIES.map((category, index) => ({
     code: String(6000 + index * 10),

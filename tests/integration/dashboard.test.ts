@@ -74,24 +74,14 @@ describe("dashboard", () => {
     expect(growth.data.rows.find((row) => row.key === "2026-08")?.values.added).toBe(0);
   });
 
-  it("never invents figures for modules that don't exist yet", async () => {
+  it("shows real zeros for an empty company instead of invented figures", async () => {
     const ctx = await createCompanyWithOwner("Dash Empty");
     const { kpis, charts, activity } = await dashboard(ctx);
 
     expect(kpis).toHaveLength(9);
-    const built = [
-      "totalCustomers",
-      "totalRevenue",
-      "outstandingInvoices",
-      "totalExpenses",
-      "netProfit",
-      "totalEmployees",
-      "activeProjects",
-      "pendingTasks",
-    ];
-    for (const kpi of kpis.filter((item) => !built.includes(item.id))) {
-      expect(kpi.state).toMatchObject({ status: "unavailable", module: expect.any(String) });
-    }
+    // Every module the dashboard reads from is built now: nothing is "unavailable" and nothing is invented.
+    expect(kpis.filter((kpi) => kpi.state.status === "unavailable")).toEqual([]);
+    expect(kpis.find((kpi) => kpi.id === "lowStockItems")?.state).toMatchObject({ data: { value: "0" } });
     // Real zeros from real (empty) tables — not placeholders.
     expect(kpis.find((kpi) => kpi.id === "totalCustomers")?.state).toMatchObject({ data: { value: "0" } });
     expect(kpis.find((kpi) => kpi.id === "totalRevenue")?.state).toMatchObject({ data: { value: "0.00" } });

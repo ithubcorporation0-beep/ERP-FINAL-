@@ -94,6 +94,19 @@ model Company {
   projects               Project[]
   tasks                  Task[]
   taskAttachments        TaskAttachment[]
+  productCategories      ProductCategory[]
+  warehouses             Warehouse[]
+  products               Product[]
+  stockMovements         StockMovement[]
+  suppliers              Supplier[]
+  purchaseRequests       PurchaseRequest[]
+  purchaseRequestItems   PurchaseRequestItem[]
+  purchaseOrders         PurchaseOrder[]
+  purchaseOrderItems     PurchaseOrderItem[]
+  goodsReceipts          GoodsReceipt[]
+  goodsReceiptItems      GoodsReceiptItem[]
+  supplierInvoices       SupplierInvoice[]
+  supplierPayments       SupplierPayment[]
   notifications          Notification[]
   authTokens             AuthToken[]
   sessions               Session[]
@@ -201,6 +214,26 @@ model User {
   tasksCreated                  Task[]                  @relation("TaskCreatedBy")
   tasksUpdated                  Task[]                  @relation("TaskUpdatedBy")
   taskAttachmentsCreated        TaskAttachment[]        @relation("TaskAttachmentCreatedBy")
+  productCategoriesCreated      ProductCategory[]       @relation("ProductCategoryCreatedBy")
+  productCategoriesUpdated      ProductCategory[]       @relation("ProductCategoryUpdatedBy")
+  warehousesCreated             Warehouse[]             @relation("WarehouseCreatedBy")
+  warehousesUpdated             Warehouse[]             @relation("WarehouseUpdatedBy")
+  productsCreated               Product[]               @relation("ProductCreatedBy")
+  productsUpdated               Product[]               @relation("ProductUpdatedBy")
+  stockMovementsCreated         StockMovement[]         @relation("StockMovementCreatedBy")
+  suppliersCreated              Supplier[]              @relation("SupplierCreatedBy")
+  suppliersUpdated              Supplier[]              @relation("SupplierUpdatedBy")
+  purchaseRequestsRequested     PurchaseRequest[]       @relation("PurchaseRequestRequestedBy")
+  purchaseRequestsDecided       PurchaseRequest[]       @relation("PurchaseRequestDecidedBy")
+  purchaseRequestsCreated       PurchaseRequest[]       @relation("PurchaseRequestCreatedBy")
+  purchaseRequestsUpdated       PurchaseRequest[]       @relation("PurchaseRequestUpdatedBy")
+  purchaseOrdersCreated         PurchaseOrder[]         @relation("PurchaseOrderCreatedBy")
+  purchaseOrdersUpdated         PurchaseOrder[]         @relation("PurchaseOrderUpdatedBy")
+  goodsReceiptsCreated          GoodsReceipt[]          @relation("GoodsReceiptCreatedBy")
+  supplierInvoicesCreated       SupplierInvoice[]       @relation("SupplierInvoiceCreatedBy")
+  supplierInvoicesUpdated       SupplierInvoice[]       @relation("SupplierInvoiceUpdatedBy")
+  supplierPaymentsCreated       SupplierPayment[]       @relation("SupplierPaymentCreatedBy")
+  supplierPaymentsVoided        SupplierPayment[]       @relation("SupplierPaymentVoidedBy")
 
   @@map("users")
 }
@@ -1528,6 +1561,433 @@ model TaskAttachment {
 
   @@index([companyId, taskId, createdAt(sort: Desc)])
   @@map("task_attachments")
+}
+
+// ─── Inventory and purchasing (phase 12). Rules: docs/inventory.md ───
+
+model ProductCategory {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by") @db.Uuid
+  updatedById String?  @map("updated_by") @db.Uuid
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdBy User?     @relation("ProductCategoryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?     @relation("ProductCategoryUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  products  Product[]
+
+  @@unique([companyId, name])
+  @@unique([id, companyId])
+  @@map("product_categories")
+}
+
+model Warehouse {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  name        String
+  address     String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by") @db.Uuid
+  updatedById String?  @map("updated_by") @db.Uuid
+
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdBy      User?           @relation("WarehouseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy      User?           @relation("WarehouseUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  products       Product[]
+  stockMovements StockMovement[]
+  purchaseOrders PurchaseOrder[]
+  goodsReceipts  GoodsReceipt[]
+
+  @@unique([companyId, name])
+  @@unique([id, companyId])
+  @@map("warehouses")
+}
+
+/// A stocked item. There is deliberately no "current stock" column: stock is the sum of `stock_movements`.
+model Product {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  /// "PRD-0001", per company.
+  number        Int
+  /// Stock keeping unit, unique per company (kept by deleted products too).
+  sku           String
+  name          String
+  categoryId    String?   @map("category_id") @db.Uuid
+  brand         String?
+  /// e.g. "pcs", "kg", "box".
+  unit          String
+  purchasePrice Decimal   @map("purchase_price") @db.Decimal(18, 2)
+  sellingPrice  Decimal   @map("selling_price") @db.Decimal(18, 2)
+  /// Low-stock threshold: stock at or below this is "low".
+  minimumStock  Decimal   @default(0) @map("minimum_stock") @db.Decimal(18, 3)
+  /// Preferred supplier.
+  supplierId    String?   @map("supplier_id") @db.Uuid
+  /// Default warehouse (stock itself can be in any warehouse).
+  warehouseId   String?   @map("warehouse_id") @db.Uuid
+  description   String?
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById   String?   @map("created_by") @db.Uuid
+  updatedById   String?   @map("updated_by") @db.Uuid
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  company              Company               @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  category             ProductCategory?      @relation(fields: [categoryId, companyId], references: [id, companyId], onDelete: Restrict)
+  supplier             Supplier?             @relation(fields: [supplierId, companyId], references: [id, companyId], onDelete: Restrict)
+  warehouse            Warehouse?            @relation(fields: [warehouseId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy            User?                 @relation("ProductCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy            User?                 @relation("ProductUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  stockMovements       StockMovement[]
+  purchaseRequestItems PurchaseRequestItem[]
+  purchaseOrderItems   PurchaseOrderItem[]
+  goodsReceiptItems    GoodsReceiptItem[]
+
+  @@unique([companyId, number])
+  @@unique([companyId, sku])
+  @@unique([id, companyId])
+  @@index([companyId, deletedAt, name])
+  @@index([companyId, categoryId])
+  @@index([companyId, supplierId])
+  @@map("products")
+}
+
+enum StockMovementType {
+  STOCK_IN
+  STOCK_OUT
+  ADJUSTMENT
+  TRANSFER_OUT
+  TRANSFER_IN
+  GOODS_RECEIPT
+}
+
+/// The inventory ledger: every change to stock is one row. Append-only (a trigger refuses UPDATE and DELETE).
+model StockMovement {
+  id             String            @id @default(uuid(7)) @db.Uuid
+  companyId      String            @map("company_id") @db.Uuid
+  /// "STK-0001", per company.
+  number         Int
+  productId      String            @map("product_id") @db.Uuid
+  warehouseId    String            @map("warehouse_id") @db.Uuid
+  type           StockMovementType
+  /// Signed: positive adds stock, negative removes it. Never zero.
+  quantity       Decimal           @db.Decimal(18, 3)
+  /// Cost per unit for incoming stock (purchase price), when known.
+  unitCost       Decimal?          @map("unit_cost") @db.Decimal(18, 2)
+  movementDate   DateTime          @map("movement_date") @db.Date
+  reference      String?
+  note           String?
+  /// Both rows of a transfer share this id.
+  transferId     String?           @map("transfer_id") @db.Uuid
+  goodsReceiptId String?           @map("goods_receipt_id") @db.Uuid
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById    String?           @map("created_by") @db.Uuid
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  product      Product       @relation(fields: [productId, companyId], references: [id, companyId], onDelete: Restrict)
+  warehouse    Warehouse     @relation(fields: [warehouseId, companyId], references: [id, companyId], onDelete: Restrict)
+  goodsReceipt GoodsReceipt? @relation(fields: [goodsReceiptId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy    User?         @relation("StockMovementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, number])
+  @@index([companyId, productId, warehouseId])
+  @@index([companyId, movementDate])
+  @@index([companyId, transferId])
+  @@map("stock_movements")
+}
+
+model Supplier {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  /// "SUP-0001", per company.
+  number      Int
+  name        String
+  companyName String?   @map("company_name")
+  phone       String?
+  email       String?
+  address     String?
+  /// Tax registration number (NTN/VAT/GST …).
+  taxId       String?   @map("tax_id")
+  notes       String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by") @db.Uuid
+  updatedById String?   @map("updated_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdBy        User?             @relation("SupplierCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy        User?             @relation("SupplierUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  products         Product[]
+  purchaseRequests PurchaseRequest[]
+  purchaseOrders   PurchaseOrder[]
+  invoices         SupplierInvoice[]
+  payments         SupplierPayment[]
+
+  @@unique([companyId, number])
+  @@unique([id, companyId])
+  @@index([companyId, deletedAt, name])
+  @@map("suppliers")
+}
+
+enum PurchaseRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ORDERED
+  CANCELLED
+}
+
+model PurchaseRequest {
+  id            String                @id @default(uuid(7)) @db.Uuid
+  companyId     String                @map("company_id") @db.Uuid
+  /// "PR-0001", per company.
+  number        Int
+  requestedById String?               @map("requested_by") @db.Uuid
+  /// Suggested supplier (the purchase order decides).
+  supplierId    String?               @map("supplier_id") @db.Uuid
+  neededBy      DateTime?             @map("needed_by") @db.Date
+  reason        String
+  status        PurchaseRequestStatus @default(PENDING)
+  decisionNote  String?               @map("decision_note")
+  decidedById   String?               @map("decided_by") @db.Uuid
+  decidedAt     DateTime?             @map("decided_at") @db.Timestamptz(3)
+  createdAt     DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById   String?               @map("created_by") @db.Uuid
+  updatedById   String?               @map("updated_by") @db.Uuid
+
+  company       Company               @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  supplier      Supplier?             @relation(fields: [supplierId, companyId], references: [id, companyId], onDelete: Restrict)
+  requestedBy   User?                 @relation("PurchaseRequestRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  decidedBy     User?                 @relation("PurchaseRequestDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  createdBy     User?                 @relation("PurchaseRequestCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy     User?                 @relation("PurchaseRequestUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  items         PurchaseRequestItem[]
+  purchaseOrder PurchaseOrder?
+
+  @@unique([companyId, number])
+  @@unique([id, companyId])
+  @@index([companyId, status])
+  @@map("purchase_requests")
+}
+
+model PurchaseRequestItem {
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  companyId          String   @map("company_id") @db.Uuid
+  requestId          String   @map("request_id") @db.Uuid
+  productId          String   @map("product_id") @db.Uuid
+  quantity           Decimal  @db.Decimal(18, 3)
+  /// Estimate only; the purchase order carries the agreed price.
+  estimatedUnitPrice Decimal? @map("estimated_unit_price") @db.Decimal(18, 2)
+  position           Int
+
+  company Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  request PurchaseRequest @relation(fields: [requestId, companyId], references: [id, companyId], onDelete: Cascade)
+  product Product         @relation(fields: [productId, companyId], references: [id, companyId], onDelete: Restrict)
+
+  @@index([companyId, requestId])
+  @@map("purchase_request_items")
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id           String              @id @default(uuid(7)) @db.Uuid
+  companyId    String              @map("company_id") @db.Uuid
+  /// "PO-0001", per company.
+  number       Int
+  supplierId   String              @map("supplier_id") @db.Uuid
+  /// The approved purchase request this order fulfils (one order per request).
+  requestId    String?             @map("request_id") @db.Uuid
+  /// Where the goods are received.
+  warehouseId  String              @map("warehouse_id") @db.Uuid
+  orderDate    DateTime            @map("order_date") @db.Date
+  expectedDate DateTime?           @map("expected_date") @db.Date
+  status       PurchaseOrderStatus @default(DRAFT)
+  total        Decimal             @db.Decimal(18, 2)
+  currency     String              @db.Char(3)
+  notes        String?
+  orderedAt    DateTime?           @map("ordered_at") @db.Timestamptz(3)
+  cancelledAt  DateTime?           @map("cancelled_at") @db.Timestamptz(3)
+  cancelReason String?             @map("cancel_reason")
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById  String?             @map("created_by") @db.Uuid
+  updatedById  String?             @map("updated_by") @db.Uuid
+
+  company   Company             @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  supplier  Supplier            @relation(fields: [supplierId, companyId], references: [id, companyId], onDelete: Restrict)
+  request   PurchaseRequest?    @relation(fields: [requestId, companyId], references: [id, companyId], onDelete: Restrict)
+  warehouse Warehouse           @relation(fields: [warehouseId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy User?               @relation("PurchaseOrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?               @relation("PurchaseOrderUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  items     PurchaseOrderItem[]
+  receipts  GoodsReceipt[]
+  invoices  SupplierInvoice[]
+
+  @@unique([companyId, number])
+  @@unique([id, companyId])
+  @@unique([requestId, companyId])
+  @@index([companyId, status])
+  @@index([companyId, supplierId])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  companyId String  @map("company_id") @db.Uuid
+  orderId   String  @map("order_id") @db.Uuid
+  productId String  @map("product_id") @db.Uuid
+  quantity  Decimal @db.Decimal(18, 3)
+  unitPrice Decimal @map("unit_price") @db.Decimal(18, 2)
+  /// quantity × unit price, rounded to cents.
+  lineTotal Decimal @map("line_total") @db.Decimal(18, 2)
+  position  Int
+
+  company      Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  order        PurchaseOrder      @relation(fields: [orderId, companyId], references: [id, companyId], onDelete: Cascade)
+  product      Product            @relation(fields: [productId, companyId], references: [id, companyId], onDelete: Restrict)
+  receiptItems GoodsReceiptItem[]
+
+  @@unique([id, companyId])
+  @@index([companyId, orderId])
+  @@map("purchase_order_items")
+}
+
+/// Goods received against a purchase order. Each line adds stock through a GOODS_RECEIPT stock movement.
+model GoodsReceipt {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  /// "GRN-0001", per company.
+  number       Int
+  orderId      String   @map("order_id") @db.Uuid
+  warehouseId  String   @map("warehouse_id") @db.Uuid
+  receivedDate DateTime @map("received_date") @db.Date
+  note         String?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById  String?  @map("created_by") @db.Uuid
+
+  company        Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  order          PurchaseOrder      @relation(fields: [orderId, companyId], references: [id, companyId], onDelete: Restrict)
+  warehouse      Warehouse          @relation(fields: [warehouseId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy      User?              @relation("GoodsReceiptCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  items          GoodsReceiptItem[]
+  stockMovements StockMovement[]
+
+  @@unique([companyId, number])
+  @@unique([id, companyId])
+  @@index([companyId, orderId])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptItem {
+  id          String  @id @default(uuid(7)) @db.Uuid
+  companyId   String  @map("company_id") @db.Uuid
+  receiptId   String  @map("receipt_id") @db.Uuid
+  orderItemId String  @map("order_item_id") @db.Uuid
+  productId   String  @map("product_id") @db.Uuid
+  quantity    Decimal @db.Decimal(18, 3)
+
+  company   Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  receipt   GoodsReceipt      @relation(fields: [receiptId, companyId], references: [id, companyId], onDelete: Restrict)
+  orderItem PurchaseOrderItem @relation(fields: [orderItemId, companyId], references: [id, companyId], onDelete: Restrict)
+  product   Product           @relation(fields: [productId, companyId], references: [id, companyId], onDelete: Restrict)
+
+  @@index([companyId, receiptId])
+  @@index([companyId, orderItemId])
+  @@map("goods_receipt_items")
+}
+
+enum SupplierInvoiceStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+/// A bill from a supplier ("BILL-0001"). Recording it posts to Accounts Payable (rule B1).
+model SupplierInvoice {
+  id                String                @id @default(uuid(7)) @db.Uuid
+  companyId         String                @map("company_id") @db.Uuid
+  number            Int
+  supplierId        String                @map("supplier_id") @db.Uuid
+  orderId           String?               @map("order_id") @db.Uuid
+  /// The supplier's own invoice number.
+  supplierReference String?               @map("supplier_reference")
+  invoiceDate       DateTime              @map("invoice_date") @db.Date
+  dueDate           DateTime?             @map("due_date") @db.Date
+  subtotal          Decimal               @db.Decimal(18, 2)
+  taxAmount         Decimal               @map("tax_amount") @db.Decimal(18, 2)
+  total             Decimal               @db.Decimal(18, 2)
+  amountPaid        Decimal               @default(0) @map("amount_paid") @db.Decimal(18, 2)
+  currency          String                @db.Char(3)
+  status            SupplierInvoiceStatus @default(UNPAID)
+  notes             String?
+  cancelledAt       DateTime?             @map("cancelled_at") @db.Timestamptz(3)
+  cancelReason      String?               @map("cancel_reason")
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById       String?               @map("created_by") @db.Uuid
+  updatedById       String?               @map("updated_by") @db.Uuid
+
+  company   Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  supplier  Supplier          @relation(fields: [supplierId, companyId], references: [id, companyId], onDelete: Restrict)
+  order     PurchaseOrder?    @relation(fields: [orderId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy User?             @relation("SupplierInvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?             @relation("SupplierInvoiceUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  payments  SupplierPayment[]
+
+  @@unique([companyId, number])
+  @@unique([id, companyId])
+  @@index([companyId, status])
+  @@index([companyId, supplierId])
+  @@index([companyId, orderId])
+  @@map("supplier_invoices")
+}
+
+/// Money paid to a supplier against a bill ("SPAY-0001"). Never deleted: a mistake is voided (rule B4).
+model SupplierPayment {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  companyId   String        @map("company_id") @db.Uuid
+  number      Int
+  supplierId  String        @map("supplier_id") @db.Uuid
+  invoiceId   String        @map("invoice_id") @db.Uuid
+  amount      Decimal       @db.Decimal(18, 2)
+  method      PaymentMethod
+  reference   String?
+  paymentDate DateTime      @map("payment_date") @db.Date
+  notes       String?
+  voidedAt    DateTime?     @map("voided_at") @db.Timestamptz(3)
+  voidReason  String?       @map("void_reason")
+  voidedById  String?       @map("voided_by") @db.Uuid
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?       @map("created_by") @db.Uuid
+
+  company   Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  supplier  Supplier        @relation(fields: [supplierId, companyId], references: [id, companyId], onDelete: Restrict)
+  invoice   SupplierInvoice @relation(fields: [invoiceId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy User?           @relation("SupplierPaymentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  voidedBy  User?           @relation("SupplierPaymentVoidedBy", fields: [voidedById], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, number])
+  @@index([companyId, invoiceId])
+  @@index([companyId, supplierId])
+  @@index([companyId, paymentDate])
+  @@map("supplier_payments")
 }
 
 model NumberSequence {

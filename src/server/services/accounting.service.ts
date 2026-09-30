@@ -10,7 +10,7 @@ import type { AccountInput, JournalEntryInput, JournalListQuery } from "@/lib/va
 import { accountRepository } from "@/server/repositories/account.repository";
 import { journalRepository, type DateBounds } from "@/server/repositories/journal.repository";
 import { writeAuditLog } from "./audit.service";
-import { ledgerService } from "./ledger.service";
+import { ledgerService, type Posting } from "./ledger.service";
 import { periodBounds, salesContext } from "./sales-shared";
 
 /**
@@ -133,7 +133,7 @@ export const accountingService = {
   /** Journal entries posted for an invoice, payment or expense — to link a record to its accounting. */
   async entriesForSource(
     ctx: TenantContext,
-    sourceType: "INVOICE" | "PAYMENT" | "EXPENSE" | "PAYROLL" | "ADVANCE",
+    sourceType: Exclude<Posting["sourceType"], "MANUAL">,
     sourceId: string,
   ) {
     authorize(ctx, "accounting:view");

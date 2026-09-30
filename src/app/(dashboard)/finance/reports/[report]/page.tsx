@@ -205,8 +205,8 @@ async function Payables({ ctx, format }: ReportArgs) {
   return (
     <>
       <p className="text-sm text-muted-foreground">
-        Approved expenses not paid yet as of {report.asOf}, aged from the expense date (vendor payment terms
-        aren&apos;t recorded, so they count as due immediately).
+        Unpaid expenses and open supplier invoices as of {report.asOf}. Expenses are aged from the expense
+        date (they count as due immediately); supplier invoices from their due date.
       </p>
       <ReconciliationNote
         ok={report.reconciled}
@@ -226,13 +226,13 @@ async function Payables({ ctx, format }: ReportArgs) {
         format={format}
       />
       <MoneySection
-        title="Unpaid expenses"
+        title="Unpaid expenses and supplier invoices"
         rows={report.items.map((item) => ({
           key: item.id,
           label: `${item.code} — ${item.vendor}`,
           detail: `${item.date} · ${item.daysOutstanding} days`,
           amount: item.amount,
-          href: `/finance/expenses/${item.id}`,
+          href: item.href,
         }))}
         detailHeader="Date"
         empty="Nothing owed to vendors."

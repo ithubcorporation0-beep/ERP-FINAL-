@@ -17,6 +17,14 @@ export const RECORD_PREFIXES = {
   advance: "ADV",
   project: "PRJ",
   task: "TSK",
+  product: "PRD",
+  stock: "STK",
+  supplier: "SUP",
+  purchaseRequest: "PR",
+  purchaseOrder: "PO",
+  goodsReceipt: "GRN",
+  supplierInvoice: "BILL",
+  supplierPayment: "SPAY",
 } as const;
 export type RecordKind = keyof typeof RECORD_PREFIXES;
 

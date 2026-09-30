@@ -68,15 +68,16 @@ projects, tasks, products, suppliers, purchases, inventory, accounting. Plus `da
 Created for every company (`is_system = true`) and **read-only** — duplicate one to customize it.
 Refreshed from code by `npm run db:seed`.
 
-| Role        | Access                                                                                                                                   |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Super Admin | Everything (108 permissions). The company always keeps at least one active Super Admin                                                   |
-| Admin       | Everything except `roles:manage` and `settings:manage` — runs users and all modules                                                      |
-| Manager     | Dashboard, customers & leads, invoices (no delete), projects & tasks, approves attendance/leave/expenses/purchases, reports, views users |
-| Accountant  | Dashboard, invoices, payments, expenses, accounting; views customers, suppliers, purchases, payroll; reports                             |
-| HR Manager  | Dashboard, employees, **salary & bank details**, attendance, leaves, payroll (incl. approve/reject); reports; views users                |
-| Employee    | Dashboard; views & creates own attendance, leave and expense requests; views projects; views & edits tasks                               |
-| Customer    | No internal permissions — lands on their profile. The customer portal arrives in phase 15                                                |
+| Role              | Access                                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Super Admin       | Everything (108 permissions). The company always keeps at least one active Super Admin                                                           |
+| Admin             | Everything except `roles:manage` and `settings:manage` — runs users and all modules                                                              |
+| Manager           | Dashboard, customers & leads, invoices (no delete), projects & tasks, approves attendance/leave/expenses/purchases, reports, views users         |
+| Accountant        | Dashboard, invoices, payments, expenses, accounting; views customers, suppliers, purchases, payroll; reports                                     |
+| HR Manager        | Dashboard, employees, **salary & bank details**, attendance, leaves, payroll (incl. approve/reject); reports; views users                        |
+| Inventory Manager | Dashboard, products, inventory (stock operations, warehouses), suppliers, purchase requests/orders (create, edit, cancel — not approve), reports |
+| Employee          | Dashboard; views & creates own attendance, leave and expense requests; views projects; views & edits tasks                                       |
+| Customer          | No internal permissions — lands on their profile. The customer portal arrives in phase 15                                                        |
 
 "Only their own records" (e.g. an Employee sees only their leave requests) is a record-level rule that each
 module adds in its phase; permissions decide which _actions_ a role can perform.
@@ -223,6 +224,26 @@ entries for payroll name the action, employee and changed fields but never amoun
 **Record-level rules:** people who can't manage projects/tasks see only projects they manage or have tasks in and
 tasks assigned to them or in projects they manage (through their linked employee record); anything else is "not
 found". See `docs/projects.md`.
+
+## Inventory and purchasing
+
+| Action                                                   | Permission                                      | Built-in roles (besides Super Admin / Admin) |
+| -------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------- |
+| See products, stock, low stock, categories, valuation    | `products:view`                                 | Inventory Manager, Manager                   |
+| Create / edit / delete products and categories           | `products:create` / `edit` / `delete`           | Inventory Manager                            |
+| See stock movements and warehouses                       | `inventory:view`                                | Inventory Manager, Manager                   |
+| Stock in / out / transfer, receive goods, add warehouses | `inventory:create`                              | Inventory Manager                            |
+| Stock adjustment, edit warehouses                        | `inventory:edit`                                | Inventory Manager                            |
+| Suppliers                                                | `suppliers:view` / `create` / `edit` / `delete` | Inventory Manager (all), Accountant (view)   |
+| See purchase requests, orders, bills, payments           | `purchases:view`                                | Inventory Manager, Manager, Accountant       |
+| Raise purchase requests, create purchase orders          | `purchases:create`                              | Inventory Manager                            |
+| Edit / place draft orders                                | `purchases:edit`                                | Inventory Manager                            |
+| Approve / reject purchase requests (**never your own**)  | `purchases:approve` / `purchases:reject`        | Manager                                      |
+| Cancel orders and others' requests                       | `purchases:delete`                              | Inventory Manager                            |
+| Record supplier invoices and payments                    | `accounting:create` (+ `purchases:view`)        | Accountant                                   |
+| Cancel unpaid bills, void supplier payments              | `accounting:edit`                               | Accountant                                   |
+
+A requester without `purchases:view` sees only their own purchase requests. See `docs/inventory.md`.
 
 ## Dashboard widgets
 

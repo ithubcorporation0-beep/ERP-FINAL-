@@ -23,6 +23,13 @@ import {
 } from "@/config/accounting";
 import { EMPLOYMENT_STATUSES, EXIT_STATUSES, LEAVE_STATUSES, LEAVE_TYPES } from "@/config/hr";
 import { PAYROLL_STATUSES, SALARY_COMPONENT_KINDS } from "@/config/payroll";
+import {
+  PURCHASE_ORDER_STATUSES,
+  PURCHASE_REQUEST_STATUSES,
+  STOCK_MOVEMENT_TYPES,
+  STOCK_OPERATIONS,
+  SUPPLIER_INVOICE_STATUSES,
+} from "@/config/inventory";
 import { PROJECT_STATUSES, TASK_PRIORITIES, TASK_STATUSES } from "@/config/projects";
 import { DATE_RANGE_PRESETS, DEFAULT_DATE_RANGE } from "@/lib/date-range";
 import { isCountryCode, isCurrencyCode, isLocale, isTimeZone } from "@/lib/intl";
@@ -643,6 +650,225 @@ export const taskListQuerySchema = paginationSchema.extend({
 export const taskStatusSchema = z.object({ id: idSchema, status: z.enum(TASK_STATUSES) });
 export const taskAssignSchema = z.object({ id: idSchema, assigneeId: optionalId });
 
+// ─── Inventory and purchasing ───
+
+/** A quantity > 0 with up to 3 decimals, as an exact string. */
+const positiveQuantity = decimalText(3, "Enter a quantity like 1 or 2.5.").refine(
+  (value) => /[1-9]/.test(value),
+  "Must be more than 0.",
+);
+const moneyText = decimalText(2, "Enter an amount like 100 or 99.50.");
+const MAX_PURCHASE_LINES = 100;
+
+export const productCategorySchema = z.object({
+  name: z.string().trim().min(1, "Enter a category name.").max(100),
+  description: optionalText(500),
+});
+
+export const warehouseSchema = z.object({
+  name: z.string().trim().min(1, "Enter a warehouse name.").max(100),
+  address: optionalText(500),
+  isActive: z.boolean().optional(),
+});
+
+export const productSchema = z.object({
+  sku: z
+    .string()
+    .trim()
+    .min(1, "Enter a SKU.")
+    .max(64)
+    .regex(/^[A-Za-z0-9._\/-]+$/, "Use letters, digits and . _ - / only (no spaces)."),
+  name: z.string().trim().min(2, "Enter a product name.").max(200),
+  categoryId: optionalId,
+  brand: optionalText(100),
+  unit: z.string().trim().min(1, "Enter a unit such as pcs or kg.").max(20),
+  purchasePrice: moneyText,
+  sellingPrice: moneyText,
+  minimumStock: decimalText(3, "Enter a quantity like 0, 5 or 2.5."),
+  supplierId: optionalId,
+  warehouseId: optionalId,
+  description: optionalText(2000),
+  isActive: z.boolean().optional(),
+});
+
+export const productListQuerySchema = paginationSchema.extend({
+  categoryId: idSchema.optional().catch(undefined),
+  supplierId: idSchema.optional().catch(undefined),
+  warehouseId: idSchema.optional().catch(undefined),
+  stock: z.enum(["low", "out"]).optional().catch(undefined),
+  inactive: z.enum(["1"]).optional().catch(undefined),
+});
+
+/**
+ * A stock operation typed by hand. IN / OUT: quantity to add / remove. ADJUST: the counted quantity (the stock is
+ * set to it; the difference is recorded). TRANSFER: quantity moved from `warehouseId` to `toWarehouseId`.
+ */
+export const stockOperationSchema = z
+  .object({
+    operation: z.enum(STOCK_OPERATIONS),
+    productId: idSchema,
+    warehouseId: z.uuid("Choose a warehouse."),
+    toWarehouseId: optionalId,
+    quantity: decimalText(3, "Enter a quantity like 1 or 2.5."),
+    unitCost: z.union([z.literal(""), moneyText]).optional(),
+    movementDate: isoDate,
+    reference: optionalText(120),
+    note: optionalText(1000),
+  })
+  .refine((value) => value.operation === "ADJUST" || /[1-9]/.test(value.quantity), {
+    path: ["quantity"],
+    message: "Must be more than 0.",
+  })
+  .refine((value) => value.operation !== "TRANSFER" || Boolean(value.toWarehouseId), {
+    path: ["toWarehouseId"],
+    message: "Choose the warehouse to move the stock to.",
+  })
+  .refine((value) => value.operation !== "TRANSFER" || value.toWarehouseId !== value.warehouseId, {
+    path: ["toWarehouseId"],
+    message: "Choose a different warehouse.",
+  })
+  .refine((value) => value.operation !== "ADJUST" || Boolean(value.note?.trim()), {
+    path: ["note"],
+    message: "Say why the stock is adjusted (e.g. stock count, damage).",
+  });
+
+export const stockMovementListQuerySchema = paginationSchema.extend({
+  productId: idSchema.optional().catch(undefined),
+  warehouseId: idSchema.optional().catch(undefined),
+  type: listFilter(STOCK_MOVEMENT_TYPES),
+});
+
+export const supplierSchema = z.object({
+  name: z.string().trim().min(1, "Enter the supplier's name.").max(200),
+  companyName: optionalText(200),
+  phone: optionalPhone,
+  email: optionalEmail,
+  address: optionalText(500),
+  taxId: optionalText(50),
+  notes: optionalText(5000),
+  isActive: z.boolean().optional(),
+});
+
+export const supplierListQuerySchema = paginationSchema.extend({
+  inactive: z.enum(["1"]).optional().catch(undefined),
+});
+
+const purchaseRequestLineSchema = z.object({
+  productId: z.uuid("Choose a product."),
+  quantity: positiveQuantity,
+  estimatedUnitPrice: z.union([z.literal(""), moneyText]).optional(),
+});
+
+export const purchaseRequestSchema = z.object({
+  supplierId: optionalId,
+  neededBy: optionalDate,
+  reason: z.string().trim().min(3, "Say what the purchase is for.").max(2000),
+  items: z
+    .array(purchaseRequestLineSchema)
+    .min(1, "Add at least one product.")
+    .max(MAX_PURCHASE_LINES, `Use at most ${MAX_PURCHASE_LINES} lines.`),
+});
+
+export const purchaseRequestDecisionSchema = z.discriminatedUnion("decision", [
+  z.object({ decision: z.literal("approve"), note: optionalText(1000) }),
+  z.object({ decision: z.literal("reject"), note: z.string().trim().min(3, "Give a reason.").max(1000) }),
+  z.object({ decision: z.literal("cancel"), note: optionalText(1000) }),
+]);
+
+export const purchaseRequestListQuerySchema = paginationSchema.extend({
+  status: listFilter(PURCHASE_REQUEST_STATUSES),
+  mine: z.enum(["1"]).optional().catch(undefined),
+});
+
+const purchaseOrderLineSchema = z.object({
+  productId: z.uuid("Choose a product."),
+  quantity: positiveQuantity,
+  unitPrice: moneyText,
+});
+
+export const purchaseOrderSchema = z
+  .object({
+    supplierId: z.uuid("Choose a supplier."),
+    warehouseId: z.uuid("Choose the warehouse that receives the goods."),
+    /** The approved purchase request this order fulfils ("" for none). */
+    requestId: optionalId,
+    orderDate: isoDate,
+    expectedDate: optionalDate,
+    notes: optionalText(5000),
+    items: z
+      .array(purchaseOrderLineSchema)
+      .min(1, "Add at least one product.")
+      .max(MAX_PURCHASE_LINES, `Use at most ${MAX_PURCHASE_LINES} lines.`),
+  })
+  .refine((value) => !value.expectedDate || value.expectedDate >= value.orderDate, {
+    path: ["expectedDate"],
+    message: "Can't be before the order date.",
+  });
+
+export const purchaseOrderStatusSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("order") }),
+  z.object({ action: z.literal("cancel"), reason: z.string().trim().min(3, "Give a reason.").max(500) }),
+]);
+
+export const purchaseOrderListQuerySchema = paginationSchema.extend({
+  status: listFilter(PURCHASE_ORDER_STATUSES),
+  supplierId: idSchema.optional().catch(undefined),
+});
+
+export const goodsReceiptSchema = z.object({
+  receivedDate: isoDate,
+  note: optionalText(1000),
+  /** Only lines with a quantity are received; the rest stay open. */
+  items: z
+    .array(
+      z.object({
+        orderItemId: idSchema,
+        quantity: z.union([z.literal(""), decimalText(3, "Enter a quantity like 1 or 2.5.")]),
+      }),
+    )
+    .min(1)
+    .max(MAX_PURCHASE_LINES),
+});
+
+export const supplierInvoiceSchema = z
+  .object({
+    supplierId: z.uuid("Choose a supplier."),
+    orderId: optionalId,
+    supplierReference: optionalText(80),
+    invoiceDate: isoDate,
+    dueDate: optionalDate,
+    subtotal: positiveMoney,
+    taxAmount: moneyText,
+    notes: optionalText(2000),
+  })
+  .refine((value) => !value.dueDate || value.dueDate >= value.invoiceDate, {
+    path: ["dueDate"],
+    message: "Can't be before the invoice date.",
+  });
+
+export const supplierInvoiceListQuerySchema = paginationSchema.extend({
+  status: listFilter(SUPPLIER_INVOICE_STATUSES),
+  supplierId: idSchema.optional().catch(undefined),
+  open: z.enum(["1"]).optional().catch(undefined),
+});
+
+export const cancelSupplierInvoiceSchema = z.object({
+  reason: z.string().trim().min(3, "Say why the bill is cancelled.").max(500),
+});
+
+export const supplierPaymentSchema = z.object({
+  invoiceId: idSchema,
+  amount: positiveMoney,
+  method: z.enum(PAYMENT_METHODS),
+  reference: optionalText(120),
+  paymentDate: isoDate,
+  notes: optionalText(2000),
+});
+
+export const supplierPaymentListQuerySchema = paginationSchema.extend({
+  supplierId: idSchema.optional().catch(undefined),
+});
+
 export const loginSchema = z.object({
   email: z.email("Enter a valid email address.").toLowerCase(),
   password: z.string().min(1, "Enter your password.").max(200),
@@ -792,6 +1018,22 @@ export type ProjectInput = z.infer<typeof projectSchema>;
 export type ProjectListQuery = z.infer<typeof projectListQuerySchema>;
 export type TaskInput = z.infer<typeof taskSchema>;
 export type TaskListQuery = z.infer<typeof taskListQuerySchema>;
+export type ProductCategoryInput = z.infer<typeof productCategorySchema>;
+export type WarehouseInput = z.infer<typeof warehouseSchema>;
+export type ProductInput = z.infer<typeof productSchema>;
+export type ProductListQuery = z.infer<typeof productListQuerySchema>;
+export type StockOperationInput = z.infer<typeof stockOperationSchema>;
+export type StockMovementListQuery = z.infer<typeof stockMovementListQuerySchema>;
+export type SupplierInput = z.infer<typeof supplierSchema>;
+export type SupplierListQuery = z.infer<typeof supplierListQuerySchema>;
+export type PurchaseRequestInput = z.infer<typeof purchaseRequestSchema>;
+export type PurchaseRequestListQuery = z.infer<typeof purchaseRequestListQuerySchema>;
+export type PurchaseOrderInput = z.infer<typeof purchaseOrderSchema>;
+export type PurchaseOrderListQuery = z.infer<typeof purchaseOrderListQuerySchema>;
+export type GoodsReceiptInput = z.infer<typeof goodsReceiptSchema>;
+export type SupplierInvoiceInput = z.infer<typeof supplierInvoiceSchema>;
+export type SupplierInvoiceListQuery = z.infer<typeof supplierInvoiceListQuerySchema>;
+export type SupplierPaymentInput = z.infer<typeof supplierPaymentSchema>;
 export type ExpenseListQuery = z.infer<typeof expenseListQuerySchema>;
 export type AccountInput = z.infer<typeof accountSchema>;
 export type JournalEntryInput = z.infer<typeof journalEntrySchema>;

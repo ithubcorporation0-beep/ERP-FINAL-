@@ -2,12 +2,16 @@
 
 import {
   ArrowLeftRight,
+  ArrowRightLeft,
   CalendarDays,
+  ClipboardList,
+  FileSpreadsheet,
   FileText,
   HandCoins,
   Plus,
   Receipt,
   ReceiptText,
+  ShoppingCart,
   WalletCards,
 } from "lucide-react";
 import Link from "next/link";
@@ -65,7 +69,18 @@ interface ListConfig {
     description: string;
     createHref?: string;
     createLabel?: string;
-    icon: "quote" | "invoice" | "payment" | "expense" | "journal" | "leave" | "payroll";
+    icon:
+      | "quote"
+      | "invoice"
+      | "payment"
+      | "expense"
+      | "journal"
+      | "leave"
+      | "payroll"
+      | "request"
+      | "purchase"
+      | "bill"
+      | "stock";
   };
 }
 
@@ -77,6 +92,10 @@ const ICONS = {
   journal: ArrowLeftRight,
   leave: CalendarDays,
   payroll: WalletCards,
+  request: ClipboardList,
+  purchase: ShoppingCart,
+  bill: FileSpreadsheet,
+  stock: ArrowRightLeft,
 } as const;
 const ALL = "all";
 const col = createDataTableColumns<SalesRow>();
@@ -91,7 +110,7 @@ interface SalesListProps {
 
 /**
  * List with search, one filter, pagination and loading/empty states — shared by quotations, orders, invoices,
- * payments, expenses, transactions, leave requests and payroll runs.
+ * payments, expenses, transactions, leave requests, payroll runs, stock movements and purchasing documents.
  */
 export function SalesList({ config, rows, total, page, pageSize }: SalesListProps) {
   const router = useRouter();

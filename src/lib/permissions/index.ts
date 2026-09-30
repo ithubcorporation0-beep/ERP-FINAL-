@@ -335,6 +335,22 @@ export const DEFAULT_ROLES: Record<string, DefaultRole> = {
       "users:view",
     ],
   },
+  "Inventory Manager": {
+    description: "Products, stock, warehouses, suppliers, purchase requests, orders and goods received.",
+    permissions: [
+      "dashboard:view",
+      "products:*",
+      "inventory:*",
+      "suppliers:*",
+      "purchases:view",
+      "purchases:create",
+      "purchases:edit",
+      "purchases:delete",
+      "purchases:export",
+      "reports:view",
+      "reports:export",
+    ],
+  },
   Employee: {
     description: "Own attendance, leave and expense requests; assigned projects and tasks.",
     permissions: [

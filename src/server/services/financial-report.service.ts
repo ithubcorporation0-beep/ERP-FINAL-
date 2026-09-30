@@ -24,6 +24,7 @@ import { expenseRepository } from "@/server/repositories/expense.repository";
 import { invoiceRepository } from "@/server/repositories/invoice.repository";
 import { journalRepository } from "@/server/repositories/journal.repository";
 import { paymentRepository } from "@/server/repositories/payment.repository";
+import { supplierInvoiceRepository } from "@/server/repositories/supplier-invoice.repository";
 import { ledgerService } from "./ledger.service";
 import { periodBounds, salesContext } from "./sales-shared";
 
@@ -210,33 +211,55 @@ export const financialReportService = {
   },
 
   /**
-   * Approved expenses bought on credit and not paid yet, by age since the expense date (they are treated as due
-   * immediately — vendor payment terms aren't recorded), and the Accounts Payable ledger balance.
+   * What the company owes vendors, and the Accounts Payable ledger balance: approved expenses bought on credit and
+   * not paid yet (aged from the expense date — they count as due immediately), plus the open balances of supplier
+   * invoices (aged from the due date, or the invoice date when there is none).
    */
   async payables(ctx: TenantContext) {
     authorize(ctx, "accounting:view");
     const { today } = await salesContext(ctx);
-    const [expenses, accounts] = await Promise.all([
+    const [expenses, bills, accounts] = await Promise.all([
       expenseRepository.listUnpaid(ctx.companyId),
+      supplierInvoiceRepository.listOpen(ctx.companyId),
       accountTotals(ctx, {}),
     ]);
     const buckets = new Map<string, string>();
-    const items = expenses.map((expense) => {
-      const date = dateToDateOnly(expense.expenseDate);
-      const bucket: AgingBucket = agingBucket(date, today);
-      addTo(buckets, bucket, money(expense.amount));
-      return {
-        id: expense.id,
-        code: formatRecordNumber("expense", expense.number),
-        vendor: expense.vendor ?? "—",
-        date,
-        daysOutstanding: Math.max(0, daysBetween(date, today)),
-        bucket,
-        amount: money(expense.amount),
-      };
-    });
+    const item = (row: {
+      id: string;
+      code: string;
+      vendor: string;
+      date: string;
+      amount: string;
+      href: string;
+    }) => {
+      const bucket: AgingBucket = agingBucket(row.date, today);
+      addTo(buckets, bucket, row.amount);
+      return { ...row, daysOutstanding: Math.max(0, daysBetween(row.date, today)), bucket };
+    };
+    const items = [
+      ...expenses.map((expense) =>
+        item({
+          id: expense.id,
+          code: formatRecordNumber("expense", expense.number),
+          vendor: expense.vendor ?? "—",
+          date: dateToDateOnly(expense.expenseDate),
+          amount: money(expense.amount),
+          href: `/finance/expenses/${expense.id}`,
+        }),
+      ),
+      ...bills.map((bill) =>
+        item({
+          id: bill.id,
+          code: formatRecordNumber("supplierInvoice", bill.number),
+          vendor: bill.supplier.name,
+          date: dateToDateOnly(bill.dueDate ?? bill.invoiceDate),
+          amount: subtractMoney(money(bill.total), money(bill.amountPaid)),
+          href: `/purchasing/bills/${bill.id}`,
+        }),
+      ),
+    ];
     const ledger = accounts.find((account) => account.systemKey === "payable")?.balance ?? "0.00";
-    const totalOpen = sumMoney(items.map((item) => item.amount));
+    const totalOpen = sumMoney(items.map((row) => row.amount));
     return {
       asOf: today,
       items,

@@ -43,13 +43,30 @@ export interface Posting {
   description: string;
   reference?: string | null;
   postingKey: string | null;
-  sourceType: "INVOICE" | "PAYMENT" | "EXPENSE" | "PAYROLL" | "ADVANCE" | "MANUAL";
+  sourceType:
+    | "INVOICE"
+    | "PAYMENT"
+    | "EXPENSE"
+    | "PAYROLL"
+    | "ADVANCE"
+    | "SUPPLIER_INVOICE"
+    | "SUPPLIER_PAYMENT"
+    | "MANUAL";
   sourceId: string | null;
   reversalOfId?: string | null;
   lines: PostingLine[];
 }
 
-const SOURCE_TYPES = ["INVOICE", "PAYMENT", "EXPENSE", "PAYROLL", "ADVANCE", "MANUAL"] as const;
+const SOURCE_TYPES = [
+  "INVOICE",
+  "PAYMENT",
+  "EXPENSE",
+  "PAYROLL",
+  "ADVANCE",
+  "SUPPLIER_INVOICE",
+  "SUPPLIER_PAYMENT",
+  "MANUAL",
+] as const;
 
 function sourceTypeOf(value: string): Posting["sourceType"] {
   const known = SOURCE_TYPES.find((type) => type === value);
@@ -447,6 +464,116 @@ export const ledgerService = {
         sourceType: "PAYROLL",
         sourceId: run.id,
         lines,
+      },
+      client,
+    );
+  },
+
+  /**
+   * Rule B1 — supplier invoice recorded: Dr Purchases (total, incl. tax — input tax isn't reclaimed) / Cr Accounts
+   * Payable. Dated the invoice date.
+   */
+  postSupplierInvoice(
+    companyId: string,
+    actorId: ActorId,
+    invoice: { id: string; number: number; invoiceDate: Date; total: { toString(): string } },
+    supplierName: string,
+    client: DbClient,
+  ) {
+    const code = formatRecordNumber("supplierInvoice", invoice.number);
+    return post(
+      companyId,
+      actorId,
+      {
+        type: "PURCHASE",
+        date: invoice.invoiceDate.toISOString().slice(0, 10),
+        description: `Supplier invoice ${code} — ${supplierName}`,
+        reference: code,
+        postingKey: `supplier-invoice:${invoice.id}`,
+        sourceType: "SUPPLIER_INVOICE",
+        sourceId: invoice.id,
+        lines: [
+          { account: { systemKey: "purchases" }, debit: money(invoice.total) },
+          { account: { systemKey: "payable" }, credit: money(invoice.total) },
+        ],
+      },
+      client,
+    );
+  },
+
+  /** Rule B2 — an unpaid supplier invoice is cancelled: reversal of B1, dated the cancellation day. */
+  postSupplierInvoiceCancelled(
+    companyId: string,
+    actorId: ActorId,
+    invoice: { id: string; number: number },
+    date: string,
+    client: DbClient,
+  ) {
+    return reverse(
+      companyId,
+      actorId,
+      { postingKey: `supplier-invoice:${invoice.id}` },
+      {
+        postingKey: `supplier-invoice:${invoice.id}:cancel`,
+        date,
+        description: `Supplier invoice ${formatRecordNumber("supplierInvoice", invoice.number)} cancelled`,
+      },
+      client,
+    );
+  },
+
+  /** Rule B3 — supplier paid: Dr Accounts Payable / Cr Cash (cash) or Bank (other methods). Dated the payment day. */
+  postSupplierPayment(
+    companyId: string,
+    actorId: ActorId,
+    payment: {
+      id: string;
+      number: number;
+      amount: { toString(): string };
+      method: string;
+      paymentDate: Date;
+    },
+    invoiceCode: string,
+    supplierName: string,
+    client: DbClient,
+  ) {
+    const code = formatRecordNumber("supplierPayment", payment.number);
+    return post(
+      companyId,
+      actorId,
+      {
+        type: "PAYMENT",
+        date: payment.paymentDate.toISOString().slice(0, 10),
+        description: `Supplier payment ${code} for ${invoiceCode} — ${supplierName}`,
+        reference: code,
+        postingKey: `supplier-payment:${payment.id}`,
+        sourceType: "SUPPLIER_PAYMENT",
+        sourceId: payment.id,
+        lines: [
+          { account: { systemKey: "payable" }, debit: money(payment.amount) },
+          { account: { systemKey: moneyAccountKey(payment.method) }, credit: money(payment.amount) },
+        ],
+      },
+      client,
+    );
+  },
+
+  /** Rule B4 — supplier payment voided: reversal of B3, dated the void day. */
+  postSupplierPaymentVoided(
+    companyId: string,
+    actorId: ActorId,
+    payment: { id: string; number: number },
+    date: string,
+    client: DbClient,
+  ) {
+    return reverse(
+      companyId,
+      actorId,
+      { postingKey: `supplier-payment:${payment.id}` },
+      {
+        postingKey: `supplier-payment:${payment.id}:void`,
+        date,
+        description: `Supplier payment ${formatRecordNumber("supplierPayment", payment.number)} voided`,
       },
       client,
     );

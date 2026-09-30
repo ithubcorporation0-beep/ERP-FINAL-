@@ -376,3 +376,28 @@ through the employee record linked to their login. Filtering happens in the repo
 API, board, dashboard and reports agree, and records outside the scope are 404 rather than 403 (no existence leak).
 Employees with `tasks:edit` can move and attach to their own tasks, but only task managers edit, assign, create or
 delete tasks. Tasks of completed or cancelled projects are frozen until the project is reopened.
+
+## ADR-046: Stock as the sum of an append-only movement ledger (phase 12)
+
+Products have no stock column. Stock per product and warehouse is `SUM(stock_movements.quantity)`, computed with
+`groupBy` when needed, so there is nothing that can drift from the history and no code path that can "set" stock.
+Movements are insert-only (a trigger refuses UPDATE/DELETE), a trigger refuses any insert that leaves a
+product/warehouse negative, and services lock the product row before a stock-reducing movement so concurrent
+stock-outs serialize. Low-stock lists are computed from the sums first and then paged in SQL by id. A cached stock
+table maintained by triggers would scale further; it is not needed at this size and would be a second source of
+truth.
+
+## ADR-047: Purchasing as guarded status transitions with segregation of duties (phase 12)
+
+Each step updates only from the expected status (`updateMany … where status in (…)`), and steps that depend on
+quantities or balances lock the parent row (purchase order for receipts, bill for payments). A purchase request is
+never approved by its requester; recording or paying a supplier invoice needs accounting rights, so purchasing staff
+order and receive while finance recognises the liability and pays. An order is linked to at most one request (unique
+key), and bills can't bill more than the order total.
+
+## ADR-048: Periodic purchases accounting (phase 12)
+
+Supplier invoices post Dr Purchases (an expense account) / Cr Accounts Payable; goods receipts and stock movements
+don't post. This keeps the ledger correct without costing every stock movement (FIFO/average cost, COGS on sale),
+which needs sales-to-stock integration that doesn't exist yet. The inventory valuation report is a management
+figure, not a balance-sheet amount; moving to perpetual inventory is a later, explicit change.

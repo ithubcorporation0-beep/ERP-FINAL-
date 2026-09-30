@@ -24,7 +24,7 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 | 09  | `feat(phase-09): implement HR employees attendance and leave`     | ✅     |
 | 10  | `feat(phase-10): implement payroll`                               | ✅     |
 | 11  | `feat(phase-11): implement projects tasks and kanban`             | ✅     |
-| 12  | `feat(phase-12): implement inventory and purchasing`              | ⬜     |
+| 12  | `feat(phase-12): implement inventory suppliers and purchases`     | ✅     |
 | 13  | `feat(phase-13): implement notifications and audit logs`          | 🟡     |
 | 14  | `feat(phase-14): implement reports and exports`                   | ⬜     |
 | 15  | `feat(phase-15): implement customer portal and advanced features` | ⬜     |
@@ -184,8 +184,16 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 
 ## Phase 12 — Inventory and purchasing
 
-- ⬜ Products/services, stock movements, reorder alerts
-- ⬜ Suppliers, purchase orders → stock-in
+- ✅ Products (`PRD-0001`): SKU, category, brand, unit, purchase/selling price, minimum stock, supplier, warehouse;
+  current stock **calculated from stock movements** (no stored stock; movements append-only; never negative)
+- ✅ Stock in, stock out, adjustment (to a counted quantity), transfer between warehouses; inventory history;
+  warehouses and categories; low-stock detection (dashboard, banner, filter, report); stock valuation report
+- ✅ Suppliers (`SUP-0001`) with products, purchase history and payment history
+- ✅ Purchase request (approval, never by the requester) → purchase order → goods received (adds stock) →
+  supplier invoice (posts to Accounts Payable) → payment (partial, void); AP report includes supplier bills
+- ✅ New built-in role Inventory Manager; permission checks, audit log, tenant isolation tests
+- Not in scope (documented in `docs/inventory.md`): stock from sales invoices, COGS/FIFO costing, serial/batch,
+  supplier returns, low-stock notifications
 
 ## Phase 13 — Notifications and audit logs
 

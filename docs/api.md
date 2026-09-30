@@ -105,6 +105,31 @@ Rules and visibility: `docs/projects.md`. Records outside the caller's scope are
 | GET / POST         | `/api/tasks/:id/attachments` (multipart `file`)                                                       | `tasks:view` / `tasks:edit`         |
 | GET / DELETE       | `/api/tasks/:id/attachments/:attachmentId` (download / delete own, or any as task manager)            | `tasks:view` / `tasks:edit`         |
 
+## Inventory and purchasing (phase 12)
+
+Rules: `docs/inventory.md`. Stock is never written directly — only through `POST /api/inventory` and goods receipts.
+
+| Method                         | Path                                                                                                                | Permission                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| GET / POST                     | `/api/products?search=&categoryId=&warehouseId=&stock=low\|out&inactive=1` / create                                 | `products:view` / `products:create`                                            |
+| GET / PUT / DELETE             | `/api/products/:id` (GET: stock per warehouse, on order, value; DELETE 409 while in stock)                          | `products:view` / `edit` / `delete`                                            |
+| GET                            | `/api/products/low-stock`                                                                                           | `products:view`                                                                |
+| GET / POST, PUT / DELETE       | `/api/products/categories`, `/api/products/categories/:id`                                                          | `products:view` / `create`, `edit` / `delete`                                  |
+| GET / POST                     | `/api/inventory?productId=&warehouseId=&type=` (history) / `{ operation: IN\|OUT\|ADJUST\|TRANSFER, … }`            | `inventory:view` / `inventory:create` (ADJUST: `inventory:edit`)               |
+| GET / POST, PUT / DELETE       | `/api/inventory/warehouses`, `/api/inventory/warehouses/:id`                                                        | view: inventory, products or purchases; `inventory:create` / `edit` / `delete` |
+| GET                            | `/api/inventory/valuation`                                                                                          | `products:view`                                                                |
+| GET / POST, GET / PUT / DELETE | `/api/suppliers`, `/api/suppliers/:id` (GET includes products, orders, bills, payments)                             | `suppliers:*`                                                                  |
+| GET / POST                     | `/api/purchases/requests` / create                                                                                  | `purchases:view` (own requests with `purchases:create`) / `purchases:create`   |
+| GET, POST                      | `/api/purchases/requests/:id`, `/api/purchases/requests/:id/decision` `{ decision: approve\|reject\|cancel, note }` | approve / reject / requester or delete (never your own approval)               |
+| GET / POST                     | `/api/purchases/orders` / create (Draft; `requestId` of an approved request)                                        | `purchases:view` / `purchases:create`                                          |
+| GET / PUT                      | `/api/purchases/orders/:id` (received / remaining per line) / edit a draft                                          | `purchases:view` / `purchases:edit`                                            |
+| POST                           | `/api/purchases/orders/:id/status` `{ action: order }` or `{ action: cancel, reason }`                              | `purchases:edit` / `purchases:delete`                                          |
+| POST                           | `/api/purchases/orders/:id/receipts` `{ receivedDate, note?, items: [{ orderItemId, quantity }] }`                  | `inventory:create`                                                             |
+| GET / POST                     | `/api/purchases/bills` / record (posts B1)                                                                          | `purchases:view` / `accounting:create`                                         |
+| GET, POST                      | `/api/purchases/bills/:id`, `/api/purchases/bills/:id/cancel` `{ reason }` (B2)                                     | `purchases:view`, `accounting:edit`                                            |
+| GET / POST                     | `/api/purchases/payments` / pay `{ invoiceId, amount, method, paymentDate, … }` (B3)                                | `purchases:view` / `accounting:create`                                         |
+| POST                           | `/api/purchases/payments/:id/void` `{ reason }` (B4)                                                                | `accounting:edit`                                                              |
+
 ## Planned
 
-products, suppliers, purchases, inventory, reports. See `MASTER-ERP-BUILD-PLAN.md`.
+reports and exports. See `MASTER-ERP-BUILD-PLAN.md`.

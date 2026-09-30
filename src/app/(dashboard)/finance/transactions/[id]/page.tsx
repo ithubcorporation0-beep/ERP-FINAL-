@@ -32,6 +32,7 @@ const SOURCE_LINKS: Record<string, (id: string) => string> = {
   INVOICE: (id) => `/sales/invoices/${id}`,
   EXPENSE: (id) => `/finance/expenses/${id}`,
   PAYROLL: (id) => `/payroll/runs/${id}`,
+  SUPPLIER_INVOICE: (id) => `/purchasing/bills/${id}`,
 };
 
 export default async function TransactionPage({ params }: PageProps<"/finance/transactions/[id]">) {

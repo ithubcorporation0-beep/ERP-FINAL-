@@ -60,7 +60,12 @@ export const KPI_WIDGETS: readonly WidgetDefinition<KpiId>[] = [
   { id: "totalEmployees", label: "Total employees", source: "hr", permissions: ["employees:view"] },
   { id: "activeProjects", label: "Active projects", source: "projects", permissions: ["projects:view"] },
   { id: "pendingTasks", label: "Pending tasks", source: "projects", permissions: ["tasks:view"] },
-  { id: "lowStockItems", label: "Low stock items", source: "inventory", permissions: ["inventory:view"] },
+  {
+    id: "lowStockItems",
+    label: "Low stock items",
+    source: "inventory",
+    permissions: ["inventory:view", "products:view"],
+  },
 ];
 
 export const CHART_IDS = [
@@ -198,7 +203,13 @@ export const QUICK_ACTIONS: readonly QuickActionDefinition[] = [
     permission: "projects:create",
     href: "/projects/new",
   },
-  { id: "addProduct", label: "Add product", source: "inventory", permission: "products:create" },
+  {
+    id: "addProduct",
+    label: "Add product",
+    source: "inventory",
+    permission: "products:create",
+    href: "/inventory/products/new",
+  },
   {
     id: "recordPayment",
     label: "Record payment",

@@ -32,6 +32,7 @@ import { taskRepository } from "@/server/repositories/task.repository";
 import { invoiceRepository } from "@/server/repositories/invoice.repository";
 import { paymentRepository } from "@/server/repositories/payment.repository";
 import { attendanceService } from "./attendance.service";
+import { productService } from "./product.service";
 import { projectScope } from "./project.service";
 import { taskScope } from "./task.service";
 
@@ -149,6 +150,12 @@ const kpiProviders: Partial<Record<KpiId, KpiProvider>> = {
       value: String(scope ? await taskRepository.countOpen(ctx.companyId, scope) : 0),
       format: "number",
     };
+  },
+
+  /** Active products at or below their minimum stock right now (stock = sum of movements; not limited to the range). */
+  async lowStockItems({ ctx }) {
+    const low = await productService.lowStockFor(ctx.companyId);
+    return { value: String(low.length), format: "number" };
   },
 
   /** What customers owe right now on open invoices (not limited to the range). */

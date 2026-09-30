@@ -17,9 +17,7 @@ async function signedIn(browser: Browser, email: string, password: string): Prom
 
 const figures = (page: Page) => page.getByRole("region", { name: "Key figures" });
 
-test("Super Admin sees every widget; modules not built yet say so instead of showing numbers", async ({
-  browser,
-}) => {
+test("Super Admin sees every widget with real figures", async ({ browser }) => {
   const page = await signedIn(browser, adminEmail, adminPassword);
   await page.goto("/dashboard");
   await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible();
@@ -27,8 +25,8 @@ test("Super Admin sees every widget; modules not built yet say so instead of sho
   for (const label of ["Total revenue", "Net profit", "Total customers", "Low stock items"]) {
     await expect(figures(page).getByText(label, { exact: true })).toBeVisible();
   }
-  // Only inventory (low stock) isn't built yet.
-  await expect(figures(page).getByText(/Not tracked yet/)).toHaveCount(1);
+  // Every module is built now: no figure says "Not tracked yet".
+  await expect(figures(page).getByText(/Not tracked yet/)).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Customer growth" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Revenue vs expenses" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Recent activity" })).toBeVisible();
@@ -42,6 +40,10 @@ test("Super Admin sees every widget; modules not built yet say so instead of sho
   );
   await expect(page.getByRole("link", { name: /Add employee/ })).toHaveAttribute("href", "/hr/employees/new");
   await expect(page.getByRole("link", { name: /Create project/ })).toHaveAttribute("href", "/projects/new");
+  await expect(page.getByRole("link", { name: /Add product/ })).toHaveAttribute(
+    "href",
+    "/inventory/products/new",
+  );
 });
 
 test("date filter is kept in the URL and reloads the figures", async ({ browser }) => {

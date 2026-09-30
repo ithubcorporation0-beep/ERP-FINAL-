@@ -39,6 +39,7 @@ add their own accounts; an account with transactions can't be deleted (deactivat
 | 3000      | Owner's Equity                                                   | Equity    | Credit      |
 | 4000      | Sales Revenue                                                    | Revenue   | Credit      |
 | 4900      | Other Income                                                     | Revenue   | Credit      |
+| 5000      | Purchases (supplier invoices, phase 12)                          | Expense   | Debit       |
 | 6000–6080 | One expense account per expense category (Rent … Other Expenses) | Expense   | Debit       |
 
 Balances are shown on the account's normal side (`normalBalance()`); a negative balance means the account is on
@@ -69,15 +70,15 @@ in `docs/permissions.md` → Finance.
 
 ## Reports
 
-| Report              | Source                             | Definition                                                                                                                                                    |
-| ------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Profit & Loss       | Ledger                             | Revenue and expense account balances for entries dated in the period; net profit = revenue − expenses                                                         |
-| Balance Sheet       | Ledger                             | All balances up to the end of the chosen day; unclosed profit is shown as "Current earnings" inside equity; badge shows whether assets = liabilities + equity |
-| Cash Flow           | Ledger (Cash and Bank accounts)    | Opening balance, money in (debits) and out (credits) by transaction type, closing balance                                                                     |
-| Accounts Receivable | Invoices (sub-ledger) + AR account | Open invoice balances aged by due date (current, 1–30, 31–60, 61–90, 90+ days overdue), reconciled with AR                                                    |
-| Accounts Payable    | Expenses (sub-ledger) + AP account | Approved unpaid expenses aged from the expense date, reconciled with AP                                                                                       |
-| Expense Report      | Expenses                           | Approved expenses by category (exact share %) and top vendors                                                                                                 |
-| Revenue Report      | Invoices and payments              | Issued invoices (incl. tax) by month and customer; cash received by payment method                                                                            |
+| Report              | Source                                      | Definition                                                                                                                                                    |
+| ------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Profit & Loss       | Ledger                                      | Revenue and expense account balances for entries dated in the period; net profit = revenue − expenses                                                         |
+| Balance Sheet       | Ledger                                      | All balances up to the end of the chosen day; unclosed profit is shown as "Current earnings" inside equity; badge shows whether assets = liabilities + equity |
+| Cash Flow           | Ledger (Cash and Bank accounts)             | Opening balance, money in (debits) and out (credits) by transaction type, closing balance                                                                     |
+| Accounts Receivable | Invoices (sub-ledger) + AR account          | Open invoice balances aged by due date (current, 1–30, 31–60, 61–90, 90+ days overdue), reconciled with AR                                                    |
+| Accounts Payable    | Expenses and supplier invoices + AP account | Approved unpaid expenses aged from the expense date, reconciled with AP                                                                                       |
+| Expense Report      | Expenses                                    | Approved expenses by category (exact share %) and top vendors                                                                                                 |
+| Revenue Report      | Invoices and payments                       | Issued invoices (incl. tax) by month and customer; cash received by payment method                                                                            |
 
 Periods use the company's time zone and fiscal year; all sums use exact decimal arithmetic. Every report is also
 available as JSON at `/api/accounting/reports/<slug>`.
@@ -87,8 +88,10 @@ available as JSON at `/api/accounting/reports/<slug>`.
 - **Accrual basis at the invoice date** only; no cash-basis P&L.
 - **Tax is simplified:** invoice tax goes to one Tax Payable account; no tax returns, input tax on expenses, or
   multiple tax jurisdictions.
-- **Accounts payable is simplified:** only expenses marked "Not paid yet"; no vendor bills, payment terms or
-  partial vendor payments (purchasing arrives in phase 12). Unpaid expenses count as due immediately.
+- **Accounts payable is simplified:** expenses marked "Not paid yet" (due immediately) and supplier invoices
+  (phase 12, aged from their due date, partial payments allowed); no payment terms or supplier credit notes.
+- **Purchases are expensed when billed** (periodic method, account 5000 Purchases); stock isn't capitalised and
+  there is no cost of goods sold — see `docs/inventory.md` (rules B1–B4).
 - **Cash flow is a simplified direct method:** no operating / investing / financing classification.
 - **No period closing:** no closing entries, locked periods or retained-earnings roll-forward; profit stays in
   "Current earnings".

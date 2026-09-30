@@ -18,6 +18,7 @@ const REQUIRED_ROLES = [
   "Manager",
   "Accountant",
   "HR Manager",
+  "Inventory Manager",
   "Employee",
   "Customer",
 ];
@@ -91,7 +92,7 @@ describe("default roles", () => {
   });
 
   it("keep sensitive administration away from operational roles", () => {
-    for (const role of ["Manager", "Accountant", "HR Manager", "Employee", "Customer"]) {
+    for (const role of ["Manager", "Accountant", "HR Manager", "Inventory Manager", "Employee", "Customer"]) {
       const permissions = permissionsOf(role);
       expect(permissions.has("users:manage"), role).toBe(false);
       expect(permissions.has("roles:manage"), role).toBe(false);
@@ -107,6 +108,10 @@ describe("default roles", () => {
     expect(permissionsOf("Manager").has("leaves:approve")).toBe(true);
     expect(permissionsOf("Employee").has("leaves:create")).toBe(true);
     expect(permissionsOf("Employee").has("leaves:approve")).toBe(false);
+    expect(permissionsOf("Inventory Manager").has("inventory:edit")).toBe(true);
+    // Purchasing staff can't approve their own purchasing or move money.
+    expect(permissionsOf("Inventory Manager").has("purchases:approve")).toBe(false);
+    expect(permissionsOf("Inventory Manager").has("accounting:create")).toBe(false);
     expect(permissionsOf("Customer").size).toBe(0);
   });
 });

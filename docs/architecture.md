@@ -254,6 +254,20 @@ Rules, visibility and limitations: `docs/projects.md`.
 
 `findNavItem` picks the most specific menu item, so `/projects/tasks/…` highlights "Tasks", not "Projects".
 
+## Inventory and purchasing
+
+Rules, workflow, ledger rules and limitations: `docs/inventory.md`.
+
+| Piece      | Where                                                                                                                                                                         |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pure rules | `src/lib/inventory.ts` (exact quantities, stock on hand, low stock, adjustments, receipts, bill status); vocabulary `src/config/inventory.ts`                                 |
+| Stock      | `stock.service.ts` (`STK-0001`, `recordMovement`, product row lock); `stock.repository.ts` (insert-only; sums with `groupBy`)                                                 |
+| Products   | `product.service.ts` (`PRD-0001`, stock from movements, low stock, valuation); categories and warehouses services                                                             |
+| Suppliers  | `supplier.service.ts` (`SUP-0001`, related products / orders / bills / payments)                                                                                              |
+| Purchasing | `purchase-request.service.ts` (`PR-`), `purchase-order.service.ts` (`PO-`, goods receipts `GRN-`), `supplier-invoice.service.ts` (`BILL-`, `SPAY-`, ledger rules B1–B4)       |
+| UI         | `src/features/inventory`, `src/features/purchasing`; lists reuse `SalesList`                                                                                                  |
+| Pages      | `/inventory` (+ `/products/…`, `/movements`, `/warehouses`, `/categories`, `/reports`), `/purchasing/suppliers`, `/requests`, `/orders` (+ `/receive`), `/bills`, `/payments` |
+
 ## Backend conventions
 
 ### Authentication and authorization
