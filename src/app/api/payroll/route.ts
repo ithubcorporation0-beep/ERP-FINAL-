@@ -1,9 +1,22 @@
 import { NextResponse } from "next/server";
 import { handle } from "@/lib/api";
 import { requirePermission } from "@/lib/tenant";
+import { payrollListQuerySchema, payrollRunSchema } from "@/lib/validation";
+import { payrollService } from "@/server/services/payroll.service";
 
-// TODO: implement following the customers module (repository → service → route).
-export const GET = handle(async () => {
-  await requirePermission("payroll:view");
-  return NextResponse.json({ error: "Not implemented" }, { status: 501 });
+/** Payroll runs with employee count and net total. Salary data: `payroll:view` only. */
+export const GET = handle(async (req: Request) => {
+  const ctx = await requirePermission("payroll:view");
+  const query = payrollListQuerySchema.parse(Object.fromEntries(new URL(req.url).searchParams));
+  return NextResponse.json(await payrollService.list(ctx, query), {
+    headers: { "Cache-Control": "private, no-store" },
+  });
+});
+
+/** Processes a month `{ period: "YYYY-MM", payDate, notes? }` — 409 if the month already has a payroll. */
+export const POST = handle(async (req: Request) => {
+  const ctx = await requirePermission("payroll:create");
+  return NextResponse.json(await payrollService.process(ctx, payrollRunSchema.parse(await req.json())), {
+    status: 201,
+  });
 });

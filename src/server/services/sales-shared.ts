@@ -138,6 +138,19 @@ function percent(value: { toString(): string }): string {
   return text === "0" || /^0(\.0+)?$/.test(text) ? "—" : `${text.replace(/\.?0+$/, "")}%`;
 }
 
+/** The company block printed on documents (quotations, invoices, salary slips). */
+export function companyParty({ company, locale }: SalesContext): { name: string; lines: string[] } {
+  return {
+    name: company.legalName ?? company.name,
+    lines: [
+      company.address ?? "",
+      countryName(company.country, locale) ?? "",
+      [company.email, company.phone].filter(Boolean).join(" · "),
+      company.taxId ? `Tax number: ${company.taxId}` : "",
+    ],
+  };
+}
+
 /** How a document is shown — on screen, printed and in the PDF — formatted in the company's locale. */
 export function presentDocument(sales: SalesContext, doc: DocumentForPdf): DocumentPresentation {
   const { company, locale } = sales;
@@ -147,15 +160,7 @@ export function presentDocument(sales: SalesContext, doc: DocumentForPdf): Docum
     title: doc.title,
     code: doc.code,
     status: doc.status,
-    company: {
-      name: company.legalName ?? company.name,
-      lines: [
-        company.address ?? "",
-        countryName(company.country, locale) ?? "",
-        [company.email, company.phone].filter(Boolean).join(" · "),
-        company.taxId ? `Tax number: ${company.taxId}` : "",
-      ],
-    },
+    company: companyParty(sales),
     customer: {
       name: doc.customer.companyName ?? doc.customer.name,
       lines: [

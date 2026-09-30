@@ -43,13 +43,13 @@ export interface Posting {
   description: string;
   reference?: string | null;
   postingKey: string | null;
-  sourceType: "INVOICE" | "PAYMENT" | "EXPENSE" | "MANUAL";
+  sourceType: "INVOICE" | "PAYMENT" | "EXPENSE" | "PAYROLL" | "ADVANCE" | "MANUAL";
   sourceId: string | null;
   reversalOfId?: string | null;
   lines: PostingLine[];
 }
 
-const SOURCE_TYPES = ["INVOICE", "PAYMENT", "EXPENSE", "MANUAL"] as const;
+const SOURCE_TYPES = ["INVOICE", "PAYMENT", "EXPENSE", "PAYROLL", "ADVANCE", "MANUAL"] as const;
 
 function sourceTypeOf(value: string): Posting["sourceType"] {
   const known = SOURCE_TYPES.find((type) => type === value);
@@ -348,6 +348,105 @@ export const ledgerService = {
           { account: { systemKey: "payable" }, debit: money(expense.amount) },
           { account: { systemKey: moneyAccountKey(payment.method) }, credit: money(expense.amount) },
         ],
+      },
+      client,
+    );
+  },
+
+  /** Rule P1 — a salary advance is paid out: Dr Other Assets (receivable from the employee) / Cr Cash or Bank. */
+  postAdvancePaid(
+    companyId: string,
+    actorId: ActorId,
+    advance: {
+      id: string;
+      number: number;
+      amount: { toString(): string };
+      advanceDate: Date;
+      paymentMethod: string;
+    },
+    employeeName: string,
+    client: DbClient,
+  ) {
+    const code = formatRecordNumber("advance", advance.number);
+    return post(
+      companyId,
+      actorId,
+      {
+        type: "PAYMENT",
+        date: advance.advanceDate.toISOString().slice(0, 10),
+        description: `Salary advance ${code} — ${employeeName}`,
+        reference: code,
+        postingKey: `advance:${advance.id}`,
+        sourceType: "ADVANCE",
+        sourceId: advance.id,
+        lines: [
+          { account: { systemKey: "assets" }, debit: money(advance.amount) },
+          { account: { systemKey: moneyAccountKey(advance.paymentMethod) }, credit: money(advance.amount) },
+        ],
+      },
+      client,
+    );
+  },
+
+  /** Rule P2 — an outstanding advance is cancelled: reversal of P1 (the money came back). */
+  postAdvanceCancelled(
+    companyId: string,
+    actorId: ActorId,
+    advanceId: string,
+    date: string,
+    client: DbClient,
+  ) {
+    return reverse(
+      companyId,
+      actorId,
+      { postingKey: `advance:${advanceId}` },
+      { postingKey: `advance:${advanceId}:cancel`, date, description: "Salary advance cancelled" },
+      client,
+    );
+  },
+
+  /**
+   * Rule P3 — a payroll run is paid:
+   *   Dr Salaries expense      gross (basic + allowances + bonus + overtime)
+   *   Cr Tax Payable           tax withheld
+   *   Cr Other Liabilities     other deductions withheld
+   *   Cr Other Assets          advances recovered
+   *   Cr Cash or Bank          net salaries paid
+   * Zero lines are left out; balanced because gross = tax + deductions + advances + net (the payroll formula).
+   */
+  postPayrollPaid(
+    companyId: string,
+    actorId: ActorId,
+    run: { id: string; number: number; periodLabel: string },
+    totals: { gross: string; tax: string; deductions: string; advances: string; net: string },
+    payment: { method: string; date: string },
+    client: DbClient,
+  ) {
+    const code = formatRecordNumber("payroll", run.number);
+    const all: PostingLine[] = [
+      { account: { systemKey: "expense_salaries" }, debit: totals.gross, description: "Gross pay" },
+      { account: { systemKey: "tax_payable" }, credit: totals.tax, description: "Tax withheld" },
+      {
+        account: { systemKey: "liabilities" },
+        credit: totals.deductions,
+        description: "Deductions withheld",
+      },
+      { account: { systemKey: "assets" }, credit: totals.advances, description: "Advances recovered" },
+      { account: { systemKey: moneyAccountKey(payment.method) }, credit: totals.net, description: "Net pay" },
+    ];
+    const lines = all.filter((line) => compareMoney(line.debit ?? line.credit ?? "0.00", "0.00") !== 0);
+    return post(
+      companyId,
+      actorId,
+      {
+        type: "PAYMENT",
+        date: payment.date,
+        description: `Payroll ${code} — ${run.periodLabel}`,
+        reference: code,
+        postingKey: `payroll:${run.id}:paid`,
+        sourceType: "PAYROLL",
+        sourceId: run.id,
+        lines,
       },
       client,
     );

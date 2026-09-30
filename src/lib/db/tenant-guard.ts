@@ -32,6 +32,10 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   "EmployeeDocument",
   "AttendanceRecord",
   "LeaveRequest",
+  "SalaryComponent",
+  "SalaryAdvance",
+  "PayrollRun",
+  "PayrollItem",
   "Notification",
   "AuditLog",
 ]);

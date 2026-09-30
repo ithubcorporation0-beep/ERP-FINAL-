@@ -3,7 +3,7 @@
 PostgreSQL (15+, developed on 16) through **Prisma 7**. Schema: `prisma/schema.prisma`.
 Prisma settings (connection URL, migrations folder, seed command): `prisma.config.ts`.
 
-## What exists today (phases 02–09)
+## What exists today (phases 02–10)
 
 The **core platform** tables. ERP module tables (invoices, employees, stock, …) are added by the
 phase that builds each module, so every table is designed with its real requirements.
@@ -28,7 +28,10 @@ companies ──┬── memberships ── users ──┬── sessions
             ├── departments ── employees ──┬── employee_compensations (restricted; encrypted bank numbers)
             │                  (user → users) ├── employee_documents
             │                              ├── attendance_records (one per employee and day)
-            │                              └── leave_requests
+            │                              ├── leave_requests
+            │                              ├── salary_components (restricted structure lines)
+            │                              └── salary_advances
+            ├── payroll_runs ── payroll_items (one per employee; net formula CHECK)
             └── notifications
 ```
 
@@ -63,6 +66,10 @@ companies ──┬── memberships ── users ──┬── sessions
 | `employee_documents`            | `company_id`                               | Files attached to an employee (same shape as `customer_documents`)                                                                                                             |
 | `attendance_records`            | `company_id`                               | One row per employee and day: check-in/out instants, status, late / early / worked minutes, source (self / HR), note                                                           |
 | `leave_requests`                | `company_id`                               | Leave (`number` = LV-0001): employee, type, dates, working days, reason, attachment, status and decision; soft delete                                                          |
+| `salary_components`             | `company_id`                               | Salary structure lines: allowance, deduction or tax; name, monthly amount, active flag. Restricted: `salaries:*`                                                               |
+| `salary_advances`               | `company_id`                               | Advances (`number` = ADV-0001): employee, amount, date, method, reason, status (outstanding / recovered / cancelled), recovering run                                           |
+| `payroll_runs`                  | `company_id`                               | Payroll per month (`number` = PRL-0001): period, pay date, status workflow, `active_period` (unique per company while not cancelled), approval and payment                     |
+| `payroll_items`                 | `company_id`                               | Payslips: employee snapshot, basic, allowances, bonus, overtime, deductions, tax, advances, net (NUMERIC 18,2), line snapshot (JSON), note                                     |
 | `notifications`                 | `company_id`                               | In-app notifications (the header bell)                                                                                                                                         |
 
 ## Conventions
@@ -99,7 +106,7 @@ Not covered by the guard (review these by hand): raw SQL (`$queryRaw`, `$execute
 (today: `customerRepository.countCreatedByMonth`, grouping by month in the company's time zone, and
 `numberSequenceRepository.next`, an atomic upsert-and-increment; `invoiceRepository.lock` (`SELECT … FOR UPDATE`) and
 `sumIssuedByMonth`; `journalRepository.monthlyByType`, ledger totals per month; `employeeRepository.lock`, `SELECT … FOR UPDATE`
-before the leave overlap check); it always filters
+before the leave overlap check; `payrollRepository.lockRun` before every change to a payroll run); it always filters
 `company_id = ${companyId}` explicitly, uses tagged-template parameters (never string concatenation), validates the
 rows with Zod, and has an isolation test. PostgreSQL row-level security can be added later as a sixth
 layer (see ADR-024).
@@ -186,15 +193,17 @@ Integration tests (`tests/integration`) run against **PostgreSQL, not mocks**:
 
 ## Migrations
 
-| Migration                                      | Contents                                                                                                                                                                                                                                                                                                          |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `20260925184444_init`                          | Core platform schema (phase 02). Replaced the phase-00 draft before any deployment — see ADR-015.                                                                                                                                                                                                                 |
-| `20260926172858_auth_and_rbac`                 | Phase 03: `auth_tokens`, user security columns (verification, lockout, profile), session absolute expiry. **Data migration:** permission verbs `read→view`, `update→edit`; role `Owner→Super Admin`; retired `Sales Rep` kept as a custom role; existing users marked verified. Run `npm run db:seed` afterwards. |
-| `20260926181244_company_context_and_logo`      | Phase 04: `sessions.active_company_id` (company switcher, `SET NULL` if the company is deleted); `companies.logo_key`, `logo_content_type`, `logo_updated_at`.                                                                                                                                                    |
-| `20260927120000_crm_customers_and_leads`       | Phase 06: CRM enums; new customer columns; `customer_documents`, `customer_communications`, `leads`, `number_sequences`. **Data migration:** existing customers are numbered 1, 2, 3… per company (oldest first) and each company's `customer` sequence continues after them.                                     |
-| `20260927160000_sales_invoices_and_payments`   | Phase 07: quotations (+ items), invoices (+ items), payments, share links; `leads (id, company_id)` unique for composite keys.                                                                                                                                                                                    |
-| `20260927160100_sales_money_checks`            | Phase 07: CHECK constraints — payment amount > 0, 0 ≤ amount paid ≤ total, totals ≥ 0, due/expiry ≥ document date, line quantity > 0, percentages 0–100.                                                                                                                                                          |
-| `20260928100000_expenses_and_accounting`       | Phase 08: accounting and expense enums; `accounts`, `journal_entries`, `journal_lines`, `expenses`.                                                                                                                                                                                                               |
-| `20260928100100_ledger_integrity`              | Phase 08: CHECK `journal_lines_one_side`, `expenses_amount_positive`; function `check_journal_entry_balanced()` and deferred constraint trigger `journal_lines_balanced`. Run `npm run db:seed` afterwards to create default accounts and post existing invoices/payments.                                        |
-| `20260929100000_hr_employees_attendance_leave` | Phase 09: HR enums; `departments`, `employees`, `employee_compensations`, `employee_documents`, `attendance_records`, `leave_requests`. Run `npm run db:seed` afterwards so built-in roles get `salaries:*`.                                                                                                      |
-| `20260929100100_hr_integrity`                  | Phase 09: CHECK constraints — exit date required for resigned/terminated and not before joining; salary ≥ 0; absent days have no times and present days a check-in; check-out ≥ check-in; minutes ≥ 0; leave end ≥ start and days > 0.                                                                            |
+| Migration                                      | Contents                                                                                                                                                                                                                                                                                                                 |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `20260925184444_init`                          | Core platform schema (phase 02). Replaced the phase-00 draft before any deployment — see ADR-015.                                                                                                                                                                                                                        |
+| `20260926172858_auth_and_rbac`                 | Phase 03: `auth_tokens`, user security columns (verification, lockout, profile), session absolute expiry. **Data migration:** permission verbs `read→view`, `update→edit`; role `Owner→Super Admin`; retired `Sales Rep` kept as a custom role; existing users marked verified. Run `npm run db:seed` afterwards.        |
+| `20260926181244_company_context_and_logo`      | Phase 04: `sessions.active_company_id` (company switcher, `SET NULL` if the company is deleted); `companies.logo_key`, `logo_content_type`, `logo_updated_at`.                                                                                                                                                           |
+| `20260927120000_crm_customers_and_leads`       | Phase 06: CRM enums; new customer columns; `customer_documents`, `customer_communications`, `leads`, `number_sequences`. **Data migration:** existing customers are numbered 1, 2, 3… per company (oldest first) and each company's `customer` sequence continues after them.                                            |
+| `20260927160000_sales_invoices_and_payments`   | Phase 07: quotations (+ items), invoices (+ items), payments, share links; `leads (id, company_id)` unique for composite keys.                                                                                                                                                                                           |
+| `20260927160100_sales_money_checks`            | Phase 07: CHECK constraints — payment amount > 0, 0 ≤ amount paid ≤ total, totals ≥ 0, due/expiry ≥ document date, line quantity > 0, percentages 0–100.                                                                                                                                                                 |
+| `20260928100000_expenses_and_accounting`       | Phase 08: accounting and expense enums; `accounts`, `journal_entries`, `journal_lines`, `expenses`.                                                                                                                                                                                                                      |
+| `20260928100100_ledger_integrity`              | Phase 08: CHECK `journal_lines_one_side`, `expenses_amount_positive`; function `check_journal_entry_balanced()` and deferred constraint trigger `journal_lines_balanced`. Run `npm run db:seed` afterwards to create default accounts and post existing invoices/payments.                                               |
+| `20260929100000_hr_employees_attendance_leave` | Phase 09: HR enums; `departments`, `employees`, `employee_compensations`, `employee_documents`, `attendance_records`, `leave_requests`. Run `npm run db:seed` afterwards so built-in roles get `salaries:*`.                                                                                                             |
+| `20260929100100_hr_integrity`                  | Phase 09: CHECK constraints — exit date required for resigned/terminated and not before joining; salary ≥ 0; absent days have no times and present days a check-in; check-out ≥ check-in; minutes ≥ 0; leave end ≥ start and days > 0.                                                                                   |
+| `20260930100000_payroll`                       | Phase 10: payroll enums; `salary_components`, `salary_advances`, `payroll_runs`, `payroll_items`.                                                                                                                                                                                                                        |
+| `20260930100100_payroll_integrity`             | Phase 10: CHECKs — amounts ≥ 0; **net = basic + allowances + bonus + overtime − deductions − tax − advances**; month 1–12; `active_period` matches the month unless cancelled; paid ⇔ paid date; recovered advance ⇔ run. Trigger `payroll_items_frozen` blocks changes to payslips of approved, paid or cancelled runs. |

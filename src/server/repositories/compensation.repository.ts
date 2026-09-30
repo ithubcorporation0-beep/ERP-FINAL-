@@ -36,6 +36,14 @@ export const compensationRepository = {
     });
   },
 
+  /** Basic salaries of many employees (payroll processing). */
+  listSalaries(companyId: string, employeeIds: readonly string[], client: DbClient = db) {
+    return client.employeeCompensation.findMany({
+      where: { companyId, employeeId: { in: [...employeeIds] } },
+      select: { employeeId: true, salary: true, currency: true },
+    });
+  },
+
   upsert(
     companyId: string,
     employeeId: string,

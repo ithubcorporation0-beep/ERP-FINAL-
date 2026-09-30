@@ -47,7 +47,8 @@ Salary, bank name, account title, account number and IBAN are restricted persona
    serializer also redacts `salary`, `accountNumber*` and `iban*` keys everywhere.
 6. Responses carrying pay are sent with `Cache-Control: private, no-store`.
 
-Salary itself is not encrypted: payroll (phase 10) must sum it in the database; it is protected by 1, 2 and 5.
+Salary itself is not encrypted: payroll must sum it in the database; it is protected by 1, 2 and 5. Salary
+structures and payroll are described in `docs/payroll.md`.
 
 ## Attendance
 

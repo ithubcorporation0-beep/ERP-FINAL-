@@ -166,6 +166,7 @@ export const employeeRepository = {
         status: true,
         joiningDate: true,
         exitDate: true,
+        position: true,
         department: { select: { name: true } },
       },
       orderBy: [{ name: "asc" }],

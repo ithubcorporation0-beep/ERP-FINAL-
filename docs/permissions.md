@@ -192,6 +192,22 @@ another person's record is "not found", in pages and the API. Self-service needs
 employee record. Salary and bank details are never part of employee responses; see `docs/hr.md`.
 `salaries:*` is new in phase 09 — run `npm run db:seed` after deploying.
 
+## Payroll
+
+| Action                                                                       | Permission                           | Built-in roles (besides Super Admin / Admin) |
+| ---------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------- |
+| See payroll runs, payslips, salary slips, advances, reports, payroll history | `payroll:view`                       | HR Manager, Accountant                       |
+| Process a month, record advances                                             | `payroll:create`                     | HR Manager                                   |
+| Adjust draft payslips, recalculate, submit for approval                      | `payroll:edit`                       | HR Manager                                   |
+| Approve a submitted run (**never the person who processed it**)              | `payroll:approve`                    | HR Manager                                   |
+| Send a submitted run back to draft                                           | `payroll:reject`                     | HR Manager                                   |
+| Mark an approved run as paid (posts to the ledger)                           | `payroll:view` + `accounting:create` | Accountant                                   |
+| Cancel an unpaid run, cancel an outstanding advance                          | `payroll:delete`                     | HR Manager                                   |
+| See / change salary structures (basic salary and recurring lines)            | `salaries:view` / `salaries:edit`    | HR Manager                                   |
+
+Payroll data is salary data: Managers and Employees have no payroll permission and get "no access" / 403. Audit
+entries for payroll name the action, employee and changed fields but never amounts. See `docs/payroll.md`.
+
 ## Dashboard widgets
 
 The dashboard needs `dashboard:view`; each widget additionally needs any one of its permissions in

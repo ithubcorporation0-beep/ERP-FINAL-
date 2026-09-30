@@ -128,7 +128,8 @@ test("an employee checks in and requests leave; an approver approves it", async 
 
   // Overlapping dates are refused by the server.
   const overlap = await employee.request.post("/api/leaves", {
-    data: { type: "CASUAL", startDate: isoDay(offset + 2), endDate: isoDay(offset + 2), reason: "Overlap" },
+    // Five days always contain working days, so the only refusal reason is the overlap.
+    data: { type: "CASUAL", startDate: isoDay(offset + 1), endDate: isoDay(offset + 5), reason: "Overlap" },
   });
   expect(overlap.status()).toBe(409);
 

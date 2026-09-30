@@ -87,6 +87,10 @@ model Company {
   employeeDocuments      EmployeeDocument[]
   attendanceRecords      AttendanceRecord[]
   leaveRequests          LeaveRequest[]
+  salaryComponents       SalaryComponent[]
+  salaryAdvances         SalaryAdvance[]
+  payrollRuns            PayrollRun[]
+  payrollItems           PayrollItem[]
   notifications          Notification[]
   authTokens             AuthToken[]
   sessions               Session[]
@@ -180,6 +184,15 @@ model User {
   leaveRequestsDecided          LeaveRequest[]          @relation("LeaveDecidedBy")
   leaveRequestsCreated          LeaveRequest[]          @relation("LeaveCreatedBy")
   leaveRequestsUpdated          LeaveRequest[]          @relation("LeaveUpdatedBy")
+  salaryComponentsCreated       SalaryComponent[]       @relation("SalaryComponentCreatedBy")
+  salaryComponentsUpdated       SalaryComponent[]       @relation("SalaryComponentUpdatedBy")
+  salaryAdvancesCreated         SalaryAdvance[]         @relation("SalaryAdvanceCreatedBy")
+  salaryAdvancesUpdated         SalaryAdvance[]         @relation("SalaryAdvanceUpdatedBy")
+  payrollRunsCreated            PayrollRun[]            @relation("PayrollRunCreatedBy")
+  payrollRunsUpdated            PayrollRun[]            @relation("PayrollRunUpdatedBy")
+  payrollRunsApproved           PayrollRun[]            @relation("PayrollRunApprovedBy")
+  payrollRunsPaid               PayrollRun[]            @relation("PayrollRunPaidBy")
+  payrollItemsUpdated           PayrollItem[]           @relation("PayrollItemUpdatedBy")
 
   @@map("users")
 }
@@ -1072,6 +1085,9 @@ model Employee {
   documents    EmployeeDocument[]
   attendance   AttendanceRecord[]
   leaves       LeaveRequest[]
+  components   SalaryComponent[]
+  advances     SalaryAdvance[]
+  payrollItems PayrollItem[]
 
   @@unique([companyId, number])
   @@unique([companyId, userId])
@@ -1226,6 +1242,164 @@ model LeaveRequest {
   @@index([companyId, employeeId, startDate])
   @@index([companyId, deletedAt, status])
   @@map("leave_requests")
+}
+
+// ─── Payroll (phase 10). Formula and rules: docs/payroll.md ───
+
+enum SalaryComponentKind {
+  ALLOWANCE
+  DEDUCTION
+  TAX
+}
+
+/// A recurring line of an employee's salary structure (the basic salary is employee_compensations.salary).
+/// Restricted like the salary: `salaries:view` / `salaries:edit`.
+model SalaryComponent {
+  id          String              @id @default(uuid(7)) @db.Uuid
+  companyId   String              @map("company_id") @db.Uuid
+  employeeId  String              @map("employee_id") @db.Uuid
+  kind        SalaryComponentKind
+  name        String
+  /// Monthly amount.
+  amount      Decimal             @db.Decimal(18, 2)
+  isActive    Boolean             @default(true) @map("is_active")
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById String?             @map("created_by") @db.Uuid
+  updatedById String?             @map("updated_by") @db.Uuid
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  employee  Employee @relation(fields: [employeeId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy User?    @relation("SalaryComponentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?    @relation("SalaryComponentUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, employeeId])
+  @@map("salary_components")
+}
+
+enum SalaryAdvanceStatus {
+  OUTSTANDING
+  RECOVERED
+  CANCELLED
+}
+
+/// Money paid to an employee ahead of payroll; recovered in full by the next paid payroll run.
+model SalaryAdvance {
+  id             String              @id @default(uuid(7)) @db.Uuid
+  companyId      String              @map("company_id") @db.Uuid
+  /// "ADV-0001", per company.
+  number         Int
+  employeeId     String              @map("employee_id") @db.Uuid
+  amount         Decimal             @db.Decimal(18, 2)
+  advanceDate    DateTime            @map("advance_date") @db.Date
+  paymentMethod  PaymentMethod       @map("payment_method")
+  reason         String
+  status         SalaryAdvanceStatus @default(OUTSTANDING)
+  recoveredRunId String?             @map("recovered_run_id") @db.Uuid
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById    String?             @map("created_by") @db.Uuid
+  updatedById    String?             @map("updated_by") @db.Uuid
+
+  company      Company     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  employee     Employee    @relation(fields: [employeeId, companyId], references: [id, companyId], onDelete: Restrict)
+  recoveredRun PayrollRun? @relation(fields: [recoveredRunId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy    User?       @relation("SalaryAdvanceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy    User?       @relation("SalaryAdvanceUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, number])
+  @@index([companyId, employeeId, status])
+  @@map("salary_advances")
+}
+
+enum PayrollStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+/// One payroll run per company and month: Draft → Submitted → Approved → Paid (or Cancelled).
+model PayrollRun {
+  id           String         @id @default(uuid(7)) @db.Uuid
+  companyId    String         @map("company_id") @db.Uuid
+  /// "PRL-0001", per company.
+  number       Int
+  periodYear   Int            @map("period_year")
+  periodMonth  Int            @map("period_month")
+  periodStart  DateTime       @map("period_start") @db.Date
+  periodEnd    DateTime       @map("period_end") @db.Date
+  /// "YYYY-MM" while the run is not cancelled, null once cancelled: unique per company, so a month can't be
+  /// processed twice (cancelled runs don't block a new one).
+  activePeriod String?        @map("active_period") @db.VarChar(7)
+  payDate      DateTime       @map("pay_date") @db.Date
+  currency     String         @db.Char(3)
+  status       PayrollStatus  @default(DRAFT)
+  notes        String?
+  reviewNote   String?        @map("review_note")
+  approvedById String?        @map("approved_by") @db.Uuid
+  approvedAt   DateTime?      @map("approved_at") @db.Timestamptz(3)
+  paidAt       DateTime?      @map("paid_at") @db.Date
+  paidMethod   PaymentMethod? @map("paid_method")
+  paidById     String?        @map("paid_by") @db.Uuid
+  cancelReason String?        @map("cancel_reason")
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById  String?        @map("created_by") @db.Uuid
+  updatedById  String?        @map("updated_by") @db.Uuid
+
+  company           Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdBy         User?           @relation("PayrollRunCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy         User?           @relation("PayrollRunUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  approvedBy        User?           @relation("PayrollRunApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  paidBy            User?           @relation("PayrollRunPaidBy", fields: [paidById], references: [id], onDelete: SetNull)
+  items             PayrollItem[]
+  recoveredAdvances SalaryAdvance[]
+
+  @@unique([companyId, number])
+  @@unique([companyId, activePeriod])
+  @@unique([id, companyId])
+  @@index([companyId, periodYear, periodMonth])
+  @@map("payroll_runs")
+}
+
+/// One employee's pay in a run. The database checks net = basic + allowances + bonus + overtime − deductions −
+/// tax − advances. Name, number, department and position are snapshots so payslips never change afterwards.
+model PayrollItem {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  companyId      String   @map("company_id") @db.Uuid
+  runId          String   @map("run_id") @db.Uuid
+  employeeId     String   @map("employee_id") @db.Uuid
+  employeeNumber Int      @map("employee_number")
+  employeeName   String   @map("employee_name")
+  departmentName String?  @map("department_name")
+  position       String?
+  basic          Decimal  @db.Decimal(18, 2)
+  allowances     Decimal  @db.Decimal(18, 2)
+  bonus          Decimal  @db.Decimal(18, 2)
+  overtime       Decimal  @db.Decimal(18, 2)
+  deductions     Decimal  @db.Decimal(18, 2)
+  tax            Decimal  @db.Decimal(18, 2)
+  advances       Decimal  @db.Decimal(18, 2)
+  net            Decimal  @db.Decimal(18, 2)
+  /// Snapshot of the structure lines and recovered advances: [{ kind, name, amount, advanceId? }].
+  lines          Json
+  /// Joined or left during the period — the basic salary is not prorated automatically (review it).
+  partialPeriod  Boolean  @default(false) @map("partial_period")
+  note           String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById    String?  @map("updated_by") @db.Uuid
+
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  run       PayrollRun @relation(fields: [runId, companyId], references: [id, companyId], onDelete: Cascade)
+  employee  Employee   @relation(fields: [employeeId, companyId], references: [id, companyId], onDelete: Restrict)
+  updatedBy User?      @relation("PayrollItemUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([runId, employeeId])
+  @@index([companyId, employeeId])
+  @@map("payroll_items")
 }
 
 model NumberSequence {

@@ -133,7 +133,7 @@ export const accountingService = {
   /** Journal entries posted for an invoice, payment or expense — to link a record to its accounting. */
   async entriesForSource(
     ctx: TenantContext,
-    sourceType: "INVOICE" | "PAYMENT" | "EXPENSE",
+    sourceType: "INVOICE" | "PAYMENT" | "EXPENSE" | "PAYROLL" | "ADVANCE",
     sourceId: string,
   ) {
     authorize(ctx, "accounting:view");

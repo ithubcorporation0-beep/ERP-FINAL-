@@ -13,6 +13,8 @@ export const RECORD_PREFIXES = {
   journal: "JE",
   employee: "EMP",
   leave: "LV",
+  payroll: "PRL",
+  advance: "ADV",
 } as const;
 export type RecordKind = keyof typeof RECORD_PREFIXES;
 

@@ -22,7 +22,7 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 | 07  | `feat(phase-07): implement sales invoices and payments`           | ✅     |
 | 08  | `feat(phase-08): implement expenses and accounting`               | ✅     |
 | 09  | `feat(phase-09): implement HR employees attendance and leave`     | ✅     |
-| 10  | `feat(phase-10): implement payroll`                               | ⬜     |
+| 10  | `feat(phase-10): implement payroll`                               | ✅     |
 | 11  | `feat(phase-11): implement projects and tasks`                    | ⬜     |
 | 12  | `feat(phase-12): implement inventory and purchasing`              | ⬜     |
 | 13  | `feat(phase-13): implement notifications and audit logs`          | 🟡     |
@@ -160,7 +160,15 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 
 ## Phase 10 — Payroll
 
-- ⬜ Payroll runs → payslips → salary journal entries, payslip PDF
+- ✅ Formula `Net = Basic + Allowances + Bonus + Overtime − Deductions − Tax − Advances` in one pure, unit-tested
+  module with exact integer-cent arithmetic; also enforced by a database CHECK on every payslip
+- ✅ Salary structures (basic + recurring allowances, deductions, tax), salary advances with full recovery
+- ✅ Payroll runs per month: process → adjust → submit → approve (not by the processor) / send back → pay → or
+  cancel; duplicate protection (unique active month, row locks, status-guarded updates, frozen approved payslips)
+- ✅ Paying posts to the ledger (rules P1–P3 in `docs/payroll.md`); salary slip PDFs; employee payroll history;
+  reports by month, department and employee
+- ✅ Salary data restricted to `payroll:view` / `salaries:*`; audited without amounts
+- Not in scope (documented): statutory tax calculation, automatic proration, employee self-service payslips
 
 ## Phase 11 — Projects and tasks
 

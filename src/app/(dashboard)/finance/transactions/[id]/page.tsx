@@ -31,6 +31,7 @@ export const metadata: Metadata = { title: "Transaction" };
 const SOURCE_LINKS: Record<string, (id: string) => string> = {
   INVOICE: (id) => `/sales/invoices/${id}`,
   EXPENSE: (id) => `/finance/expenses/${id}`,
+  PAYROLL: (id) => `/payroll/runs/${id}`,
 };
 
 export default async function TransactionPage({ params }: PageProps<"/finance/transactions/[id]">) {

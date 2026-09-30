@@ -19,6 +19,7 @@ export type NavIconName =
   | "attendance"
   | "leave"
   | "payroll"
+  | "advances"
   | "projects"
   | "inventory"
   | "reports"
@@ -176,11 +177,25 @@ export const NAV_SECTIONS: NavSection[] = [
         description: "Leave requests and approvals.",
       },
       {
-        label: "Payroll",
-        href: "/payroll",
+        label: "Payroll runs",
+        href: "/payroll/runs",
         icon: "payroll",
         permission: "payroll:view",
-        description: "Payroll runs and payslips.",
+        description: "Monthly payroll: process, approve, pay and download salary slips.",
+      },
+      {
+        label: "Salary advances",
+        href: "/payroll/advances",
+        icon: "advances",
+        permission: "payroll:view",
+        description: "Advances paid to employees, recovered by the next payroll.",
+      },
+      {
+        label: "Payroll reports",
+        href: "/payroll/reports",
+        icon: "statements",
+        permission: "payroll:view",
+        description: "Payroll cost by month, department and employee.",
       },
     ],
   },

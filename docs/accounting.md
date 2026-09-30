@@ -94,6 +94,7 @@ available as JSON at `/api/accounting/reports/<slug>`.
   "Current earnings".
 - **Single currency:** the company's base currency; no exchange rates or revaluation.
 - **No bank reconciliation, depreciation, accruals/prepayments, budgets, or trial-balance export** yet.
-- Salaries are recorded as expenses until payroll posts them (phase 10).
+- Payroll (phase 10) posts salaries, tax and deductions withheld and advances with rules P1–P3 — see
+  `docs/payroll.md`. Paying withheld tax to the authorities is a manual transaction.
 - Manual entries can post to any active account, so a manual entry to AR or AP makes the sub-ledger
   reconciliation show a difference — the reports say so instead of hiding it.

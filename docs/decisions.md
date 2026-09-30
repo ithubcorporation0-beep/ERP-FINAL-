@@ -335,3 +335,27 @@ A leave request counts working days from the schedule, may not overlap the emplo
 (checked inside a transaction holding `SELECT … FOR UPDATE` on the employee row, so concurrent requests
 serialize), and can't be approved or rejected by the person it belongs to. An exclusion constraint (btree_gist)
 would also work but needs a Postgres extension that some hosts don't enable.
+
+## ADR-041: One payroll formula, enforced twice (phase 10)
+
+The PRD formula lives in one pure module (`src/lib/payroll.ts`) used by the server, the browser preview and the unit
+tests, with exact integer-cent arithmetic and no rounding (inputs with more than two decimals are refused). The same
+equation is a CHECK constraint on `payroll_items`, so a bug or a manual SQL fix can't store a payslip whose net
+doesn't add up. Tax is an entered amount: statutory tax rules differ by country and change yearly, and implementing
+one without a spec would be a false claim of correctness.
+
+## ADR-042: Payroll runs as a guarded state machine with no self-approval (phase 10)
+
+A month has at most one non-cancelled run, enforced by a nullable `active_period` column with a unique key (NULL once
+cancelled) rather than a partial index, which Prisma can't express without schema drift. Every transition locks the
+run row and updates only from the expected status; approved payslips are frozen by a trigger; paying is idempotent
+through the ledger posting key. The processor of a run can't approve it (segregation of duties); paying needs
+accounting rights, so HR prepares and finance releases.
+
+## ADR-043: Payroll audit without amounts; advances recovered whole (phase 10)
+
+Audit entries record who processed, adjusted (employee and fields), approved, paid and cancelled a run — not the
+amounts, so readers of the audit log (who may not be allowed to see pay) learn nothing about salaries; the amounts are
+kept on frozen payslips and in the ledger, which have their own permissions. Salary advances are recovered in full,
+oldest first, only while the net stays non-negative; splitting advances into instalments is left for later so the
+rule stays simple and predictable.

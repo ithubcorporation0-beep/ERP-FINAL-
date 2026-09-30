@@ -226,6 +226,19 @@ Rules, security and limitations: `docs/hr.md`.
 | Uploads                 | `stored-files.ts` (shared by customer documents, employee documents, leave attachments); `readUpload` / `fileDownload` in `src/lib/api.ts` |
 | Pages                   | `/hr/employees`, `/hr/departments`, `/hr/attendance` (+ `/new`, `/report`), `/hr/leave`; work schedule on `/settings`                      |
 
+## Payroll
+
+Formula, workflow, ledger rules and limitations: `docs/payroll.md`.
+
+| Piece             | Where                                                                                                                       |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Formula           | `src/lib/payroll.ts` (`calculatePayroll`, `advancesToRecover`, `sumPayroll`) — pure, exact, unit-tested                     |
+| Structures        | `salary-structure.service.ts` (`salaries:*`); basic salary from `compensation.service.ts`                                   |
+| Advances          | `salary-advance.service.ts` (`ADV-0001`, ledger rules P1/P2)                                                                |
+| Runs and payslips | `payroll.service.ts` (`PRL-0001`): process, recalculate, adjust, submit, approve, reject, pay (rule P3), cancel, reports    |
+| Salary slip PDF   | `src/lib/pdf/payslip.ts` on the shared PDF writer `src/lib/pdf/writer.ts` (also used by sales documents)                    |
+| Pages             | `/payroll/runs` (+ `/new`, `/[id]`), `/payroll/advances`, `/payroll/reports`; structure and history on the employee profile |
+
 ## Backend conventions
 
 ### Authentication and authorization

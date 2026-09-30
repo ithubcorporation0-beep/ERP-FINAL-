@@ -1,6 +1,15 @@
 "use client";
 
-import { ArrowLeftRight, CalendarDays, FileText, HandCoins, Plus, Receipt, ReceiptText } from "lucide-react";
+import {
+  ArrowLeftRight,
+  CalendarDays,
+  FileText,
+  HandCoins,
+  Plus,
+  Receipt,
+  ReceiptText,
+  WalletCards,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
@@ -44,7 +53,7 @@ interface ListConfig {
   columns: {
     code: string;
     reference?: string;
-    /** Header of the "customer" column (e.g. "Employee" for expenses). Defaults to "Customer". */
+    /** Header of the "customer" column (e.g. "Employee" for expenses, "Period" for payroll). Defaults to "Customer". */
     party?: string;
     date: string;
     secondary?: string;
@@ -56,7 +65,7 @@ interface ListConfig {
     description: string;
     createHref?: string;
     createLabel?: string;
-    icon: "quote" | "invoice" | "payment" | "expense" | "journal" | "leave";
+    icon: "quote" | "invoice" | "payment" | "expense" | "journal" | "leave" | "payroll";
   };
 }
 
@@ -67,6 +76,7 @@ const ICONS = {
   expense: Receipt,
   journal: ArrowLeftRight,
   leave: CalendarDays,
+  payroll: WalletCards,
 } as const;
 const ALL = "all";
 const col = createDataTableColumns<SalesRow>();
@@ -81,7 +91,7 @@ interface SalesListProps {
 
 /**
  * List with search, one filter, pagination and loading/empty states — shared by quotations, orders, invoices,
- * payments, expenses, transactions and leave requests.
+ * payments, expenses, transactions, leave requests and payroll runs.
  */
 export function SalesList({ config, rows, total, page, pageSize }: SalesListProps) {
   const router = useRouter();

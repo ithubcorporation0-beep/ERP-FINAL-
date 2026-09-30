@@ -40,9 +40,9 @@ test.describe("desktop", () => {
     await page.keyboard.press("Control+k");
     const dialog = page.getByRole("dialog", { name: "Search" });
     await expect(dialog).toBeVisible();
-    await dialog.getByPlaceholder("Search pages…").fill("payroll");
+    await dialog.getByPlaceholder("Search pages…").fill("payroll runs");
     await page.keyboard.press("Enter");
-    await expect(page).toHaveURL(/\/payroll$/);
+    await expect(page).toHaveURL(/\/payroll\/runs$/);
   });
 
   test("user menu signs out", async ({ page }) => {

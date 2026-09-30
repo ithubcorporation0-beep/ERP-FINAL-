@@ -71,6 +71,23 @@ Rules: `docs/hr.md`. People who may only see their own attendance / leave get on
 | POST                | `/api/leaves/:id/decision` `{ decision: "approve" \| "reject", note }`                                  | `leaves:approve` / `leaves:reject`, not your own       |
 | GET / POST          | `/api/leaves/:id/attachment` (multipart `file`)                                                         | `leaves:view` (+ own pending request or `leaves:edit`) |
 
+## Payroll (phase 10)
+
+Rules: `docs/payroll.md`. All responses carrying pay are `Cache-Control: private, no-store`.
+
+| Method              | Path                                                                                                | Permission                                                                           |
+| ------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| GET / POST          | `/api/payroll?status=` / process `{ period: "YYYY-MM", payDate, notes? }` (409 if the month exists) | `payroll:view` / `payroll:create`                                                    |
+| GET                 | `/api/payroll/:id` (run, payslips, totals)                                                          | `payroll:view`                                                                       |
+| POST                | `/api/payroll/:id/status` `{ action: submit \| approve \| reject \| cancel \| pay, … }`             | per step: `payroll:edit` / `approve` / `reject` / `delete`; pay: `accounting:create` |
+| POST                | `/api/payroll/:id/recalculate`                                                                      | `payroll:edit`                                                                       |
+| PUT                 | `/api/payroll/:id/items/:itemId` `{ basic, allowances, bonus, overtime, deductions, tax, note? }`   | `payroll:edit` (draft only)                                                          |
+| GET                 | `/api/payroll/:id/items/:itemId/slip` (PDF, `?download=1`)                                          | `payroll:view`                                                                       |
+| GET / POST / DELETE | `/api/payroll/advances`, `/api/payroll/advances/:id` (cancel)                                       | `payroll:view` / `create` / `delete`                                                 |
+| GET                 | `/api/payroll/report?range=`                                                                        | `payroll:view`                                                                       |
+| GET / POST          | `/api/employees/:id/salary-structure`; PUT / DELETE `…/:componentId`                                | `salaries:view` / `salaries:edit`                                                    |
+| GET                 | `/api/employees/:id/payroll` (payroll history)                                                      | `payroll:view`                                                                       |
+
 ## Planned
 
-payroll, projects, tasks, products, suppliers, purchases, inventory, reports. See `MASTER-ERP-BUILD-PLAN.md`.
+projects, tasks, products, suppliers, purchases, inventory, reports. See `MASTER-ERP-BUILD-PLAN.md`.

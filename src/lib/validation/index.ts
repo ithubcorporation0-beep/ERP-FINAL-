@@ -22,6 +22,7 @@ import {
   TRANSACTION_TYPES,
 } from "@/config/accounting";
 import { EMPLOYMENT_STATUSES, EXIT_STATUSES, LEAVE_STATUSES, LEAVE_TYPES } from "@/config/hr";
+import { PAYROLL_STATUSES, SALARY_COMPONENT_KINDS } from "@/config/payroll";
 import { DATE_RANGE_PRESETS, DEFAULT_DATE_RANGE } from "@/lib/date-range";
 import { isCountryCode, isCurrencyCode, isLocale, isTimeZone } from "@/lib/intl";
 
@@ -503,6 +504,87 @@ export const workScheduleSchema = z
     message: "Must be after the start (overnight shifts aren't supported).",
   });
 
+// ─── Payroll ───
+
+/** A payroll amount: ≥ 0, at most 2 decimals, as an exact string. */
+const payrollAmount = decimalText(2, "Enter an amount like 5000 or 5000.50.");
+
+/** One recurring line of a salary structure. */
+export const salaryComponentSchema = z.object({
+  kind: z.enum(SALARY_COMPONENT_KINDS),
+  name: z.string().trim().min(2, "Name the component, e.g. House rent allowance.").max(100),
+  amount: payrollAmount,
+  isActive: z.boolean().optional(),
+});
+
+export const salaryAdvanceSchema = z.object({
+  employeeId: idSchema,
+  amount: decimalText(2, "Enter an amount like 5000 or 5000.50.").refine(
+    (value) => /[1-9]/.test(value),
+    "Must be more than 0.",
+  ),
+  advanceDate: isoDate,
+  paymentMethod: z.enum(PAYMENT_METHODS),
+  reason: z.string().trim().min(3, "Give a short reason.").max(1000),
+});
+
+/** Process payroll for a month ("YYYY-MM"). */
+export const payrollRunSchema = z.object({
+  period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Choose a month."),
+  payDate: isoDate,
+  notes: optionalText(1000),
+});
+
+/** HR's per-run adjustments of one payslip (advances come from recorded advances and can't be typed in). */
+export const payrollItemSchema = z.object({
+  basic: payrollAmount,
+  allowances: payrollAmount,
+  bonus: payrollAmount,
+  overtime: payrollAmount,
+  deductions: payrollAmount,
+  tax: payrollAmount,
+  note: optionalText(500),
+});
+
+/** The snapshot of structure lines and recovered advances stored on a payroll item. */
+export const payrollLinesSchema = z.array(
+  z.object({
+    kind: z.enum([...SALARY_COMPONENT_KINDS, "ADVANCE"]),
+    name: z.string(),
+    amount: z.string(),
+    advanceId: idSchema.optional(),
+  }),
+);
+export type PayrollLine = z.infer<typeof payrollLinesSchema>[number];
+
+export const payrollListQuerySchema = paginationSchema.extend({
+  status: listFilter(PAYROLL_STATUSES),
+});
+
+export const payrollDecisionSchema = z.object({ id: idSchema, note: optionalText(1000) });
+export const payrollReasonSchema = z.object({
+  id: idSchema,
+  note: z.string().trim().min(3, "Give a reason.").max(1000),
+});
+export const payrollPaySchema = z.object({
+  id: idSchema,
+  paidAt: isoDate,
+  method: z.enum(PAYMENT_METHODS),
+});
+
+/** API body for a payroll run's workflow step. */
+export const payrollStepSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("submit") }),
+  z.object({ action: z.literal("approve"), note: optionalText(1000) }),
+  z.object({ action: z.literal("reject"), note: z.string().trim().min(3, "Give a reason.").max(1000) }),
+  z.object({ action: z.literal("cancel"), note: z.string().trim().min(3, "Give a reason.").max(1000) }),
+  z.object({ action: z.literal("pay"), paidAt: isoDate, method: z.enum(PAYMENT_METHODS) }),
+]);
+
+export const payrollReportQuerySchema = z.object({
+  range: z.enum(DATE_RANGE_PRESETS).catch("this-fiscal-year"),
+});
+
 export const loginSchema = z.object({
   email: z.email("Enter a valid email address.").toLowerCase(),
   password: z.string().min(1, "Enter your password.").max(200),
@@ -643,6 +725,11 @@ export type AttendanceListQuery = z.infer<typeof attendanceListQuerySchema>;
 export type LeaveInput = z.infer<typeof leaveSchema>;
 export type LeaveListQuery = z.infer<typeof leaveListQuerySchema>;
 export type WorkScheduleInput = z.infer<typeof workScheduleSchema>;
+export type SalaryComponentInput = z.infer<typeof salaryComponentSchema>;
+export type SalaryAdvanceInput = z.infer<typeof salaryAdvanceSchema>;
+export type PayrollRunInput = z.infer<typeof payrollRunSchema>;
+export type PayrollItemInput = z.infer<typeof payrollItemSchema>;
+export type PayrollListQuery = z.infer<typeof payrollListQuerySchema>;
 export type ExpenseListQuery = z.infer<typeof expenseListQuerySchema>;
 export type AccountInput = z.infer<typeof accountSchema>;
 export type JournalEntryInput = z.infer<typeof journalEntrySchema>;

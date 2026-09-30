@@ -1,4 +1,10 @@
 import type { Metadata } from "next";
+import { PAYROLL_STATUS_LABELS, periodLabel } from "@/config/payroll";
+import { PAYROLL_STATUS_TONES } from "@/features/payroll/labels";
+import { SalaryStructurePanel } from "@/features/payroll/salary-structure-panel";
+import { money } from "@/lib/money";
+import { payrollService } from "@/server/services/payroll.service";
+import { salaryStructureService } from "@/server/services/salary-structure.service";
 import Link from "next/link";
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageHeader } from "@/components/shared/page-header";
@@ -39,16 +45,21 @@ export default async function EmployeePage({ params }: PageProps<"/hr/employees/
     pay: can(ctx, "salaries:view"),
     attendance: can(ctx, "attendance:view"),
     leave: can(ctx, "leaves:view"),
+    payroll: can(ctx, "payroll:view"),
   };
-  const [company, documents, history, pay, attendance, leaves] = await Promise.all([
+  const [company, documents, history, pay, attendance, leaves, structure, payslips] = await Promise.all([
     salesContext(ctx),
     employeeDocumentService.list(ctx, id),
     employeeService.history(ctx, id),
     sees.pay ? compensationService.get(ctx, id) : null,
     sees.attendance ? attendanceService.recentSummary(ctx, id) : null,
     sees.leave ? leaveService.list(ctx, leaveListQuerySchema.parse({ employeeId: id, pageSize: 10 })) : null,
+    sees.pay ? salaryStructureService.get(ctx, id) : null,
+    sees.payroll ? payrollService.employeeHistory(ctx, id) : null,
   ]);
   const format = { locale: company.locale, timeZone: company.timeZone, currency: company.currency };
+  const showPay = (value: string) =>
+    formatMoney(value, { ...format, currency: pay?.currency ?? company.currency }) ?? value;
   const code = formatRecordNumber("employee", employee.number);
   const canEdit = can(ctx, "employees:edit");
 
@@ -96,6 +107,7 @@ export default async function EmployeePage({ params }: PageProps<"/hr/employees/
             <TabsTrigger value="documents">Documents ({documents.length})</TabsTrigger>
             {attendance ? <TabsTrigger value="attendance">Attendance</TabsTrigger> : null}
             {leaves ? <TabsTrigger value="leave">Leave ({leaves.total})</TabsTrigger> : null}
+            {payslips ? <TabsTrigger value="payroll">Payroll ({payslips.length})</TabsTrigger> : null}
             <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
         </div>
@@ -194,6 +206,76 @@ export default async function EmployeePage({ params }: PageProps<"/hr/employees/
                       : null,
                   }}
                 />
+              </CardContent>
+            </Card>
+            {structure ? (
+              <Card className="mt-4 shadow-xs">
+                <CardHeader>
+                  <CardTitle>
+                    <h2>Salary structure</h2>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <SalaryStructurePanel
+                    employeeId={id}
+                    canEdit={can(ctx, "salaries:edit")}
+                    summary={{
+                      basic: structure.basic ? showPay(structure.basic) : "Not set — add it above",
+                      allowances: showPay(structure.preview.allowances),
+                      deductions: showPay(structure.preview.deductions),
+                      tax: showPay(structure.preview.tax),
+                      net: showPay(structure.preview.net),
+                    }}
+                    components={structure.components.map((component) => ({
+                      id: component.id,
+                      kind: component.kind,
+                      name: component.name,
+                      amount: component.amount,
+                      amountLabel: showPay(component.amount),
+                      isActive: component.isActive,
+                    }))}
+                  />
+                </CardContent>
+              </Card>
+            ) : null}
+          </TabsContent>
+        ) : null}
+
+        {payslips ? (
+          <TabsContent value="payroll">
+            <Card className="shadow-xs">
+              <CardContent>
+                {payslips.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No approved or paid payroll yet.</p>
+                ) : (
+                  <ul className="divide-y" aria-label="Payroll history">
+                    {payslips.map((slip) => (
+                      <li key={slip.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
+                        <Link href={`/payroll/runs/${slip.run.id}`} className="font-medium hover:underline">
+                          {periodLabel(slip.run.periodYear, slip.run.periodMonth, company.locale)}
+                        </Link>
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {formatRecordNumber("payroll", slip.run.number)}
+                        </span>
+                        <StatusBadge tone={PAYROLL_STATUS_TONES[slip.run.status]}>
+                          {PAYROLL_STATUS_LABELS[slip.run.status]}
+                        </StatusBadge>
+                        <span className="ml-auto" data-numeric>
+                          Net{" "}
+                          <strong>
+                            {formatMoney(money(slip.net), { ...format, currency: slip.run.currency })}
+                          </strong>
+                        </span>
+                        <a
+                          href={`/api/payroll/${slip.run.id}/items/${slip.id}/slip?download=1`}
+                          className="text-primary hover:underline"
+                        >
+                          Salary slip
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
