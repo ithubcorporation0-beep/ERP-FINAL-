@@ -12,6 +12,7 @@ import {
 } from "@/config/dashboard";
 import { EXPENSE_CATEGORY_LABELS, expenseCategoryLabel } from "@/config/accounting";
 import { LEAVE_STATUS_LABELS, LEAVE_TYPE_LABELS } from "@/config/hr";
+import { PROJECT_STATUS_LABELS, PROJECT_STATUSES, TASK_STATUS_LABELS } from "@/config/projects";
 import { formatRecordNumber } from "@/config/records";
 import { formatMoney } from "@/lib/format";
 import { addMoney, compareMoney, money, subtractMoney, sumMoney } from "@/lib/money";
@@ -26,9 +27,13 @@ import { employeeRepository } from "@/server/repositories/employee.repository";
 import { expenseRepository } from "@/server/repositories/expense.repository";
 import { journalRepository } from "@/server/repositories/journal.repository";
 import { leaveRepository } from "@/server/repositories/leave.repository";
+import { projectRepository } from "@/server/repositories/project.repository";
+import { taskRepository } from "@/server/repositories/task.repository";
 import { invoiceRepository } from "@/server/repositories/invoice.repository";
 import { paymentRepository } from "@/server/repositories/payment.repository";
 import { attendanceService } from "./attendance.service";
+import { projectScope } from "./project.service";
+import { taskScope } from "./task.service";
 
 /**
  * Dashboard figures. Every number comes from a database query scoped to the current company; a widget whose
@@ -126,6 +131,26 @@ const kpiProviders: Partial<Record<KpiId, KpiProvider>> = {
     return { value: String(value), format: "number", addedInRange };
   },
 
+  /** Active projects the user can see (employees: their own); "added" = created in the range. */
+  async activeProjects({ ctx, range }) {
+    const scope = await projectScope(ctx);
+    if (!scope) return { value: "0", format: "number" };
+    const [value, addedInRange] = await Promise.all([
+      projectRepository.countActive(ctx.companyId, scope),
+      projectRepository.countActive(ctx.companyId, scope, { from: range.from, to: range.to }),
+    ]);
+    return { value: String(value), format: "number", addedInRange };
+  },
+
+  /** Open tasks (to do, in progress, review) the user can see — employees: their own. */
+  async pendingTasks({ ctx }) {
+    const scope = await taskScope(ctx);
+    return {
+      value: String(scope ? await taskRepository.countOpen(ctx.companyId, scope) : 0),
+      format: "number",
+    };
+  },
+
   /** What customers owe right now on open invoices (not limited to the range). */
   async outstandingInvoices({ ctx }) {
     const { total, paid } = await invoiceRepository.sumOutstanding(ctx.companyId);
@@ -219,6 +244,27 @@ const chartProviders: Partial<Record<ChartId, ChartProvider>> = {
     };
   },
 
+  /** Projects by status right now (not limited to the range). */
+  async projectStatus({ ctx }) {
+    const scope = await projectScope(ctx);
+    const counts = new Map(
+      (scope ? await projectRepository.countByStatus(ctx.companyId, scope) : []).map((row) => [
+        row.status,
+        row.count,
+      ]),
+    );
+    const rows = PROJECT_STATUSES.map((status) => ({
+      key: status,
+      label: PROJECT_STATUS_LABELS[status],
+      values: { projects: counts.get(status) ?? 0 },
+    }));
+    return {
+      series: [{ key: "projects", label: "Projects", kind: "bar" }],
+      rows,
+      hasData: rows.some((row) => row.values.projects > 0),
+    };
+  },
+
   async customerGrowth({ ctx, range, locale, timeZone }) {
     const [before, monthly] = await Promise.all([
       customerRepository.countActive(ctx.companyId, { to: range.from }),
@@ -301,6 +347,31 @@ const activityProviders: Partial<Record<ActivityId, ActivityProvider>> = {
         title: `${formatRecordNumber("leave", leave.number)} · ${leave.employee.name}: ${LEAVE_TYPE_LABELS[leave.type]}`,
         detail: `${leave.days} ${leave.days === 1 ? "day" : "days"} · ${LEAVE_STATUS_LABELS[leave.status]}`,
         at: leave.createdAt.toISOString(),
+      })),
+    ];
+  },
+
+  /** Recently changed projects and tasks the user can see. */
+  async projectUpdates({ ctx }, limit) {
+    const [projects, tasks] = await Promise.all([projectScope(ctx), taskScope(ctx)]);
+    const [recentProjects, recentTasks] = await Promise.all([
+      projects ? projectRepository.listRecent(ctx.companyId, projects, limit) : [],
+      tasks ? taskRepository.listRecentlyChanged(ctx.companyId, tasks, limit) : [],
+    ]);
+    return [
+      ...recentProjects.map((project) => ({
+        id: `project:${project.id}`,
+        source: "projectUpdates" as const,
+        title: `${formatRecordNumber("project", project.number)} · ${project.name}`,
+        detail: PROJECT_STATUS_LABELS[project.status],
+        at: project.updatedAt.toISOString(),
+      })),
+      ...recentTasks.map((task) => ({
+        id: `task:${task.id}`,
+        source: "projectUpdates" as const,
+        title: `${formatRecordNumber("task", task.number)} · ${task.name} (${task.project.name})`,
+        detail: TASK_STATUS_LABELS[task.status],
+        at: task.updatedAt.toISOString(),
       })),
     ];
   },

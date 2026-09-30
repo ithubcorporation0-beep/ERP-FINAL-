@@ -208,6 +208,22 @@ employee record. Salary and bank details are never part of employee responses; s
 Payroll data is salary data: Managers and Employees have no payroll permission and get "no access" / 403. Audit
 entries for payroll name the action, employee and changed fields but never amounts. See `docs/payroll.md`.
 
+## Projects and tasks
+
+| Action                                                                   | Permission                            | Built-in roles (besides Super Admin / Admin) |
+| ------------------------------------------------------------------------ | ------------------------------------- | -------------------------------------------- |
+| See projects, progress and project reports                               | `projects:view`                       | Manager, Employee (own work only)            |
+| Create / edit / delete projects (delete only without tasks)              | `projects:create` / `edit` / `delete` | Manager                                      |
+| See tasks, the board and attachments                                     | `tasks:view`                          | Manager, Employee (own work only)            |
+| Create tasks                                                             | `tasks:create`                        | Manager                                      |
+| Edit and assign tasks (task managers: `tasks:create` or `projects:edit`) | `tasks:edit`                          | Manager                                      |
+| Move the status of visible tasks, add attachments                        | `tasks:edit`                          | Manager, Employee (own tasks)                |
+| Delete tasks                                                             | `tasks:delete`                        | Manager                                      |
+
+**Record-level rules:** people who can't manage projects/tasks see only projects they manage or have tasks in and
+tasks assigned to them or in projects they manage (through their linked employee record); anything else is "not
+found". See `docs/projects.md`.
+
 ## Dashboard widgets
 
 The dashboard needs `dashboard:view`; each widget additionally needs any one of its permissions in

@@ -23,6 +23,7 @@ import {
 } from "@/config/accounting";
 import { EMPLOYMENT_STATUSES, EXIT_STATUSES, LEAVE_STATUSES, LEAVE_TYPES } from "@/config/hr";
 import { PAYROLL_STATUSES, SALARY_COMPONENT_KINDS } from "@/config/payroll";
+import { PROJECT_STATUSES, TASK_PRIORITIES, TASK_STATUSES } from "@/config/projects";
 import { DATE_RANGE_PRESETS, DEFAULT_DATE_RANGE } from "@/lib/date-range";
 import { isCountryCode, isCurrencyCode, isLocale, isTimeZone } from "@/lib/intl";
 
@@ -585,6 +586,63 @@ export const payrollReportQuerySchema = z.object({
   range: z.enum(DATE_RANGE_PRESETS).catch("this-fiscal-year"),
 });
 
+// ─── Projects and tasks ───
+
+export const projectSchema = z
+  .object({
+    name: z.string().trim().min(2, "Enter a project name.").max(200),
+    customerId: optionalId,
+    managerId: optionalId,
+    startDate: optionalDate,
+    endDate: optionalDate,
+    budget: z.union([z.literal(""), decimalText(2, "Enter an amount like 250000 or 250000.50.")]).optional(),
+    status: z.enum(PROJECT_STATUSES),
+    description: optionalText(5000),
+  })
+  .refine((value) => !value.startDate || !value.endDate || value.endDate >= value.startDate, {
+    path: ["endDate"],
+    message: "Can't be before the start date.",
+  });
+
+export const projectListQuerySchema = paginationSchema.extend({
+  status: z
+    .enum([...PROJECT_STATUSES, "open"])
+    .optional()
+    .catch(undefined),
+  customerId: idSchema.optional().catch(undefined),
+});
+
+export const taskSchema = z
+  .object({
+    name: z.string().trim().min(2, "Enter a task name.").max(300),
+    projectId: z.uuid("Choose a project."),
+    assigneeId: optionalId,
+    priority: z.enum(TASK_PRIORITIES),
+    status: z.enum(TASK_STATUSES),
+    startDate: optionalDate,
+    dueDate: optionalDate,
+    description: optionalText(5000),
+  })
+  .refine((value) => !value.startDate || !value.dueDate || value.dueDate >= value.startDate, {
+    path: ["dueDate"],
+    message: "Can't be before the start date.",
+  });
+
+export const taskListQuerySchema = paginationSchema.extend({
+  projectId: idSchema.optional().catch(undefined),
+  assigneeId: idSchema.optional().catch(undefined),
+  status: z
+    .enum([...TASK_STATUSES, "open"])
+    .optional()
+    .catch(undefined),
+  priority: listFilter(TASK_PRIORITIES),
+  due: z.enum(["overdue", "soon"]).optional().catch(undefined),
+  mine: z.enum(["1"]).optional().catch(undefined),
+});
+
+export const taskStatusSchema = z.object({ id: idSchema, status: z.enum(TASK_STATUSES) });
+export const taskAssignSchema = z.object({ id: idSchema, assigneeId: optionalId });
+
 export const loginSchema = z.object({
   email: z.email("Enter a valid email address.").toLowerCase(),
   password: z.string().min(1, "Enter your password.").max(200),
@@ -730,6 +788,10 @@ export type SalaryAdvanceInput = z.infer<typeof salaryAdvanceSchema>;
 export type PayrollRunInput = z.infer<typeof payrollRunSchema>;
 export type PayrollItemInput = z.infer<typeof payrollItemSchema>;
 export type PayrollListQuery = z.infer<typeof payrollListQuerySchema>;
+export type ProjectInput = z.infer<typeof projectSchema>;
+export type ProjectListQuery = z.infer<typeof projectListQuerySchema>;
+export type TaskInput = z.infer<typeof taskSchema>;
+export type TaskListQuery = z.infer<typeof taskListQuerySchema>;
 export type ExpenseListQuery = z.infer<typeof expenseListQuerySchema>;
 export type AccountInput = z.infer<typeof accountSchema>;
 export type JournalEntryInput = z.infer<typeof journalEntrySchema>;

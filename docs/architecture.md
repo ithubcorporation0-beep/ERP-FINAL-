@@ -170,8 +170,8 @@ exists.
 | Conversion           | `leadService.convert`                                                       | One transaction: creates the customer, marks the lead Won, links both, audits both                                                    |
 | Numbers              | `numberSequenceRepository.next`, `formatRecordNumber`                       | `CUS-0001`, `LEAD-0001` per company; never reused; the prefix is presentation only                                                    |
 
-Invoices, payments and projects of a customer show "not tracked yet" until those modules exist (no placeholder
-rows). A lead's assignee must be an active member of the current company (checked in the service); it becomes a
+A customer's page lists their real quotations, invoices, payments and projects (each tab only with the matching
+view permission). A lead's assignee must be an active member of the current company (checked in the service); it becomes a
 link to an employee record when HR ships.
 
 ## Sales (quotations, sales orders, invoices, payments)
@@ -238,6 +238,21 @@ Formula, workflow, ledger rules and limitations: `docs/payroll.md`.
 | Runs and payslips | `payroll.service.ts` (`PRL-0001`): process, recalculate, adjust, submit, approve, reject, pay (rule P3), cancel, reports    |
 | Salary slip PDF   | `src/lib/pdf/payslip.ts` on the shared PDF writer `src/lib/pdf/writer.ts` (also used by sales documents)                    |
 | Pages             | `/payroll/runs` (+ `/new`, `/[id]`), `/payroll/advances`, `/payroll/reports`; structure and history on the employee profile |
+
+## Projects and tasks
+
+Rules, visibility and limitations: `docs/projects.md`.
+
+| Piece      | Where                                                                                                                                      |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pure rules | `src/lib/projects.ts` (work/time progress, deadlines, counts) — unit-tested; vocabulary in `src/config/projects.ts`                        |
+| Projects   | `project.service.ts` (`PRJ-0001`): list with progress, detail, create/update/delete, history, customer projects, reports                   |
+| Tasks      | `task.service.ts` (`TSK-0001`): list, board, create/update, status moves (stale-move guard), assign, attachments, history                  |
+| Visibility | `projectScope` / `taskScope`: managers see all; others their own work via the linked employee record                                       |
+| UI         | `src/features/projects` (lists, forms, board, progress bar, row mappers); DocumentPanel from CRM for attachments                           |
+| Pages      | `/projects` (+ `/new`, `/[id]`, `/[id]/edit`), `/projects/tasks` (+ `/new`, `/[id]`, `/[id]/edit`), `/projects/board`, `/projects/reports` |
+
+`findNavItem` picks the most specific menu item, so `/projects/tasks/…` highlights "Tasks", not "Projects".
 
 ## Backend conventions
 

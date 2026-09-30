@@ -86,6 +86,8 @@ describe("dashboard", () => {
       "totalExpenses",
       "netProfit",
       "totalEmployees",
+      "activeProjects",
+      "pendingTasks",
     ];
     for (const kpi of kpis.filter((item) => !built.includes(item.id))) {
       expect(kpi.state).toMatchObject({ status: "unavailable", module: expect.any(String) });
@@ -96,13 +98,14 @@ describe("dashboard", () => {
 
     const growth = charts.find((chart) => chart.id === "customerGrowth")?.state;
     expect(growth).toMatchObject({ status: "ready", data: { hasData: false } });
-    expect(charts.filter((chart) => chart.state.status === "unavailable")).toHaveLength(1);
+    expect(charts.filter((chart) => chart.state.status === "unavailable")).toHaveLength(0);
+    expect(kpis.find((kpi) => kpi.id === "activeProjects")?.state).toMatchObject({ data: { value: "0" } });
     expect(kpis.find((kpi) => kpi.id === "totalEmployees")?.state).toMatchObject({ data: { value: "0" } });
     const attendance = charts.find((chart) => chart.id === "employeeAttendance")?.state;
     expect(attendance).toMatchObject({ status: "ready", data: { hasData: false } });
 
     expect(activity.items).toEqual([]);
-    expect(activity.unavailable.map((source) => source.id)).toEqual(["projectUpdates"]);
+    expect(activity.unavailable).toEqual([]);
     expect(kpis.find((kpi) => kpi.id === "netProfit")?.state).toMatchObject({ data: { value: "0.00" } });
   });
 
@@ -186,7 +189,10 @@ describe("dashboard", () => {
       "activeProjects",
       "pendingTasks",
     ]);
-    expect((await dashboardService.activity(scope)).tracked).toEqual([]);
+    // Project updates are a real feed now (scoped to the employee's own work).
+    expect((await dashboardService.activity(scope)).tracked).toEqual([
+      { id: "projectUpdates", label: "Project updates" },
+    ]);
 
     const { ctx: accountant } = await addMember(owner, "Accountant");
     const accountantView = await ids(accountant);

@@ -23,7 +23,7 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 | 08  | `feat(phase-08): implement expenses and accounting`               | ✅     |
 | 09  | `feat(phase-09): implement HR employees attendance and leave`     | ✅     |
 | 10  | `feat(phase-10): implement payroll`                               | ✅     |
-| 11  | `feat(phase-11): implement projects and tasks`                    | ⬜     |
+| 11  | `feat(phase-11): implement projects tasks and kanban`             | ✅     |
 | 12  | `feat(phase-12): implement inventory and purchasing`              | ⬜     |
 | 13  | `feat(phase-13): implement notifications and audit logs`          | 🟡     |
 | 14  | `feat(phase-14): implement reports and exports`                   | ⬜     |
@@ -172,7 +172,15 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 
 ## Phase 11 — Projects and tasks
 
-- ⬜ Projects, tasks (kanban), assignees, due dates
+- ✅ Projects (`PRJ-0001`): customer, manager, dates, budget, status (Planning / Active / On hold / Completed /
+  Cancelled); list, details, form, progress (work done vs. time elapsed, days left, overdue); customer page tab
+- ✅ Tasks (`TSK-0001`): assignee, priority, dates, status (To do / In progress / Review / Completed), attachments,
+  deadlines (overdue / due today / due soon); list with filters, detail, form, assignment, status changes
+- ✅ Kanban board: drag and drop plus an accessible "Move to" menu, optimistic moves, stale moves refused
+- ✅ Record-level visibility (employees see their own work), permission checks on every page/action/API route,
+  audit log for every change; dashboard figures, chart and feed; project reports
+- Not in scope (documented in `docs/projects.md`): budget vs. actual cost, time tracking, dependencies, Gantt,
+  notifications
 
 ## Phase 12 — Inventory and purchasing
 

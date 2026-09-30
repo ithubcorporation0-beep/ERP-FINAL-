@@ -91,6 +91,9 @@ model Company {
   salaryAdvances         SalaryAdvance[]
   payrollRuns            PayrollRun[]
   payrollItems           PayrollItem[]
+  projects               Project[]
+  tasks                  Task[]
+  taskAttachments        TaskAttachment[]
   notifications          Notification[]
   authTokens             AuthToken[]
   sessions               Session[]
@@ -193,6 +196,11 @@ model User {
   payrollRunsApproved           PayrollRun[]            @relation("PayrollRunApprovedBy")
   payrollRunsPaid               PayrollRun[]            @relation("PayrollRunPaidBy")
   payrollItemsUpdated           PayrollItem[]           @relation("PayrollItemUpdatedBy")
+  projectsCreated               Project[]               @relation("ProjectCreatedBy")
+  projectsUpdated               Project[]               @relation("ProjectUpdatedBy")
+  tasksCreated                  Task[]                  @relation("TaskCreatedBy")
+  tasksUpdated                  Task[]                  @relation("TaskUpdatedBy")
+  taskAttachmentsCreated        TaskAttachment[]        @relation("TaskAttachmentCreatedBy")
 
   @@map("users")
 }
@@ -450,6 +458,7 @@ model Customer {
   quotations     Quotation[]
   invoices       Invoice[]
   payments       Payment[]
+  projects       Project[]
 
   @@unique([companyId, number])
   /// Target of composite foreign keys that keep children in the same company.
@@ -1076,18 +1085,20 @@ model Employee {
   updatedById              String?          @map("updated_by") @db.Uuid
   deletedAt                DateTime?        @map("deleted_at") @db.Timestamptz(3)
 
-  company      Company               @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  user         User?                 @relation("EmployeeUser", fields: [userId], references: [id], onDelete: SetNull)
-  department   Department?           @relation(fields: [departmentId, companyId], references: [id, companyId], onDelete: Restrict)
-  createdBy    User?                 @relation("EmployeeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy    User?                 @relation("EmployeeUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
-  compensation EmployeeCompensation?
-  documents    EmployeeDocument[]
-  attendance   AttendanceRecord[]
-  leaves       LeaveRequest[]
-  components   SalaryComponent[]
-  advances     SalaryAdvance[]
-  payrollItems PayrollItem[]
+  company         Company               @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user            User?                 @relation("EmployeeUser", fields: [userId], references: [id], onDelete: SetNull)
+  department      Department?           @relation(fields: [departmentId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy       User?                 @relation("EmployeeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy       User?                 @relation("EmployeeUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  compensation    EmployeeCompensation?
+  documents       EmployeeDocument[]
+  attendance      AttendanceRecord[]
+  leaves          LeaveRequest[]
+  components      SalaryComponent[]
+  advances        SalaryAdvance[]
+  payrollItems    PayrollItem[]
+  managedProjects Project[]             @relation("ProjectManager")
+  assignedTasks   Task[]                @relation("TaskAssignee")
 
   @@unique([companyId, number])
   @@unique([companyId, userId])
@@ -1400,6 +1411,123 @@ model PayrollItem {
   @@unique([runId, employeeId])
   @@index([companyId, employeeId])
   @@map("payroll_items")
+}
+
+// ─── Projects and tasks (phase 11). Rules: docs/projects.md ───
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+model Project {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  companyId   String        @map("company_id") @db.Uuid
+  /// "PRJ-0001", per company.
+  number      Int
+  name        String
+  customerId  String?       @map("customer_id") @db.Uuid
+  /// The employee managing the project.
+  managerId   String?       @map("manager_id") @db.Uuid
+  startDate   DateTime?     @map("start_date") @db.Date
+  endDate     DateTime?     @map("end_date") @db.Date
+  budget      Decimal?      @db.Decimal(18, 2)
+  currency    String        @db.Char(3)
+  status      ProjectStatus @default(PLANNING)
+  description String?
+  completedAt DateTime?     @map("completed_at") @db.Timestamptz(3)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById String?       @map("created_by") @db.Uuid
+  updatedById String?       @map("updated_by") @db.Uuid
+  deletedAt   DateTime?     @map("deleted_at") @db.Timestamptz(3)
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  customer  Customer? @relation(fields: [customerId, companyId], references: [id, companyId], onDelete: Restrict)
+  manager   Employee? @relation("ProjectManager", fields: [managerId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy User?     @relation("ProjectCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?     @relation("ProjectUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  tasks     Task[]
+
+  @@unique([companyId, number])
+  @@unique([id, companyId])
+  @@index([companyId, deletedAt, status])
+  @@index([companyId, customerId])
+  @@index([companyId, managerId])
+  @@map("projects")
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+}
+
+model Task {
+  id          String       @id @default(uuid(7)) @db.Uuid
+  companyId   String       @map("company_id") @db.Uuid
+  /// "TSK-0001", per company.
+  number      Int
+  projectId   String       @map("project_id") @db.Uuid
+  name        String
+  /// The employee the task is assigned to.
+  assigneeId  String?      @map("assignee_id") @db.Uuid
+  priority    TaskPriority @default(MEDIUM)
+  status      TaskStatus   @default(TODO)
+  startDate   DateTime?    @map("start_date") @db.Date
+  dueDate     DateTime?    @map("due_date") @db.Date
+  description String?
+  completedAt DateTime?    @map("completed_at") @db.Timestamptz(3)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdById String?      @map("created_by") @db.Uuid
+  updatedById String?      @map("updated_by") @db.Uuid
+  deletedAt   DateTime?    @map("deleted_at") @db.Timestamptz(3)
+
+  company     Company          @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  project     Project          @relation(fields: [projectId, companyId], references: [id, companyId], onDelete: Restrict)
+  assignee    Employee?        @relation("TaskAssignee", fields: [assigneeId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy   User?            @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy   User?            @relation("TaskUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  attachments TaskAttachment[]
+
+  @@unique([companyId, number])
+  @@unique([id, companyId])
+  @@index([companyId, projectId, deletedAt, status])
+  @@index([companyId, assigneeId, deletedAt, status])
+  @@index([companyId, dueDate])
+  @@map("tasks")
+}
+
+model TaskAttachment {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  taskId      String   @map("task_id") @db.Uuid
+  /// Original file name, cleaned for display and downloads.
+  name        String
+  storageKey  String   @unique @map("storage_key")
+  contentType String   @map("content_type")
+  sizeBytes   Int      @map("size_bytes")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by") @db.Uuid
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  task      Task    @relation(fields: [taskId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy User?   @relation("TaskAttachmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, taskId, createdAt(sort: Desc)])
+  @@map("task_attachments")
 }
 
 model NumberSequence {

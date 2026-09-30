@@ -88,6 +88,23 @@ Rules: `docs/payroll.md`. All responses carrying pay are `Cache-Control: private
 | GET / POST          | `/api/employees/:id/salary-structure`; PUT / DELETE `…/:componentId`                                | `salaries:view` / `salaries:edit`                                                    |
 | GET                 | `/api/employees/:id/payroll` (payroll history)                                                      | `payroll:view`                                                                       |
 
+## Projects and tasks (phase 11)
+
+Rules and visibility: `docs/projects.md`. Records outside the caller's scope are 404.
+
+| Method             | Path                                                                                                  | Permission                          |
+| ------------------ | ----------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| GET / POST         | `/api/projects?search=&status=&customerId=&page=` / create                                            | `projects:view` / `projects:create` |
+| GET / PUT / DELETE | `/api/projects/:id` (GET includes progress; DELETE 409 if it has tasks)                               | `projects:view` / `edit` / `delete` |
+| GET                | `/api/projects/report`                                                                                | `projects:view`                     |
+| GET / POST         | `/api/tasks?search=&projectId=&assigneeId=&status=&priority=&due=overdue\|soon&mine=1&page=` / create | `tasks:view` / `tasks:create`       |
+| GET                | `/api/tasks/board?projectId=&mine=1`                                                                  | `tasks:view`                        |
+| GET / PUT / DELETE | `/api/tasks/:id` (PUT: task managers only)                                                            | `tasks:view` / `edit` / `delete`    |
+| POST               | `/api/tasks/:id/status` `{ status }` (409 if moved meanwhile or the project is closed)                | `tasks:edit`                        |
+| POST               | `/api/tasks/:id/assign` `{ assigneeId }` (empty = unassign; task managers only)                       | `tasks:edit`                        |
+| GET / POST         | `/api/tasks/:id/attachments` (multipart `file`)                                                       | `tasks:view` / `tasks:edit`         |
+| GET / DELETE       | `/api/tasks/:id/attachments/:attachmentId` (download / delete own, or any as task manager)            | `tasks:view` / `tasks:edit`         |
+
 ## Planned
 
-projects, tasks, products, suppliers, purchases, inventory, reports. See `MASTER-ERP-BUILD-PLAN.md`.
+products, suppliers, purchases, inventory, reports. See `MASTER-ERP-BUILD-PLAN.md`.

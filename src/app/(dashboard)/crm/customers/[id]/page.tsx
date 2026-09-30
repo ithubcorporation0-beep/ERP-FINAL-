@@ -21,7 +21,8 @@ import { DocumentPanel } from "@/features/crm/document-panel";
 import { countryName, formatBytes, formatDate, formatDateTime } from "@/lib/format";
 import { HistoryList } from "@/features/crm/history-list";
 import { CUSTOMER_STATUS_TONES, LEAD_STATUS_TONES } from "@/features/crm/labels";
-import { RelatedUnavailable } from "@/features/crm/related-unavailable";
+import { ProjectRowsTable } from "@/features/projects/record-tables";
+import { toProjectRow } from "@/features/projects/rows";
 import { invoiceRow, paymentRow, quotationRow } from "@/features/sales/rows";
 import { SalesRowsTable } from "@/features/sales/sales-rows-table";
 import { authorizePage } from "@/lib/auth/page";
@@ -35,6 +36,7 @@ import { customerDocumentService } from "@/server/services/customer-document.ser
 import { customerService } from "@/server/services/customer.service";
 import { invoiceService } from "@/server/services/invoice.service";
 import { paymentService } from "@/server/services/payment.service";
+import { projectService } from "@/server/services/project.service";
 import { quotationService } from "@/server/services/quotation.service";
 import { salesContext } from "@/server/services/sales-shared";
 
@@ -54,8 +56,9 @@ export default async function CustomerPage({ params }: PageProps<"/crm/customers
     quotations: can(ctx, "quotations:view"),
     invoices: can(ctx, "invoices:view"),
     payments: can(ctx, "payments:view"),
+    projects: can(ctx, "projects:view"),
   };
-  const [format, communications, documents, history, leads, quotations, invoices, payments, sales] =
+  const [format, communications, documents, history, leads, quotations, invoices, payments, sales, projects] =
     await Promise.all([
       companyService.formatting(ctx),
       customerCommunicationService.list(ctx, id),
@@ -68,6 +71,7 @@ export default async function CustomerPage({ params }: PageProps<"/crm/customers
       sees.invoices ? invoiceService.listForCustomer(ctx, id) : null,
       sees.payments ? paymentService.listForCustomer(ctx, id) : null,
       salesContext(ctx),
+      sees.projects ? projectService.forCustomer(ctx, id) : null,
     ]);
   const canEdit = can(ctx, "customers:edit");
   const code = formatRecordNumber("customer", customer.number);
@@ -116,7 +120,7 @@ export default async function CustomerPage({ params }: PageProps<"/crm/customers
             ) : null}
             {invoices ? <TabsTrigger value="invoices">Invoices ({invoices.length})</TabsTrigger> : null}
             {payments ? <TabsTrigger value="payments">Payments ({payments.length})</TabsTrigger> : null}
-            <TabsTrigger value="projects">Projects</TabsTrigger>
+            {projects ? <TabsTrigger value="projects">Projects ({projects.total})</TabsTrigger> : null}
             <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
         </div>
@@ -294,7 +298,20 @@ export default async function CustomerPage({ params }: PageProps<"/crm/customers
           ) : null}
         </TabsContent>
         <TabsContent value="projects">
-          <RelatedUnavailable records="projects" module="projects" />
+          {projects ? (
+            <ProjectRowsTable
+              caption={`Projects of ${customer.name}`}
+              rows={projects.items.map((project) =>
+                toProjectRow(project, { ...sales, currency: project.currency }),
+              )}
+              empty="No projects yet"
+              create={
+                can(ctx, "projects:create")
+                  ? { href: `/projects/new?customerId=${id}`, label: "New project" }
+                  : undefined
+              }
+            />
+          ) : null}
         </TabsContent>
 
         <TabsContent value="history">

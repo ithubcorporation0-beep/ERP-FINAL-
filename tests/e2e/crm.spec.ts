@@ -108,11 +108,11 @@ test("customer lifecycle: validate, create, edit, search, note, document, delete
     page.getByRole("tabpanel", { name: "History" }).getByText("Document deleted", { exact: true }),
   ).toBeVisible();
 
-  // Sales relations are real (empty for a new customer); modules not built yet say so instead of showing rows.
+  // Sales and project relations are real (empty for a new customer).
   await page.getByRole("tab", { name: /^Invoices/ }).click();
   await expect(page.getByText("No invoices yet")).toBeVisible();
-  await page.getByRole("tab", { name: "Projects" }).click();
-  await expect(page.getByText(/Not tracked yet — appears when the Projects module/)).toBeVisible();
+  await page.getByRole("tab", { name: /^Projects/ }).click();
+  await expect(page.getByText("No projects yet")).toBeVisible();
 
   // Search the list by name and by Customer ID
   await page.goto("/crm/customers");

@@ -17,6 +17,8 @@ export interface DocumentEntry {
   uploadedBy: string | null;
   uploadedAt: string;
   uploadedAtLabel: string;
+  /** Whether this file may be deleted; defaults to `canEdit` (e.g. employees may delete only their own uploads). */
+  canDelete?: boolean;
 }
 
 const ACCEPT = ".pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx,.csv,.txt";
@@ -27,10 +29,15 @@ interface DocumentPanelProps {
   endpoint: string;
   documents: DocumentEntry[];
   canEdit: boolean;
+  /** Words for the upload button, empty state and dialogs ("document", "attachment"). */
+  noun?: string;
 }
 
-/** Upload, download and delete a record's documents (customers, employees). The server checks every file again. */
-export function DocumentPanel({ endpoint, documents, canEdit }: DocumentPanelProps) {
+/**
+ * Upload, download and delete a record's documents (customers, employees, tasks). The server checks every file
+ * and every permission again.
+ */
+export function DocumentPanel({ endpoint, documents, canEdit, noun = "document" }: DocumentPanelProps) {
   const router = useRouter();
   const inputId = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -67,7 +74,7 @@ export function DocumentPanel({ endpoint, documents, canEdit }: DocumentPanelPro
               type="file"
               accept={ACCEPT}
               className="sr-only"
-              aria-label="Choose a document to upload"
+              aria-label={`Choose ${/^[aeiou]/.test(noun) ? "an" : "a"} ${noun} to upload`}
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 if (file) void upload(file);
@@ -75,7 +82,7 @@ export function DocumentPanel({ endpoint, documents, canEdit }: DocumentPanelPro
             />
             <Button type="button" variant="outline" disabled={busy} onClick={() => input.current?.click()}>
               {busy ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Upload aria-hidden="true" />}
-              {busy ? "Uploading…" : "Upload document"}
+              {busy ? "Uploading…" : `Upload ${noun}`}
             </Button>
           </div>
         </div>
@@ -83,9 +90,12 @@ export function DocumentPanel({ endpoint, documents, canEdit }: DocumentPanelPro
       <FormStatus tone="error" message={error} />
 
       {documents.length === 0 ? (
-        <EmptyState size="compact" icon={FileText} title="No documents yet" />
+        <EmptyState size="compact" icon={FileText} title={`No ${noun}s yet`} />
       ) : (
-        <ul className="divide-y rounded-lg border" aria-label="Documents">
+        <ul
+          className="divide-y rounded-lg border"
+          aria-label={`${noun.charAt(0).toUpperCase()}${noun.slice(1)}s`}
+        >
           {documents.map((document) => (
             <li key={document.id} className="flex items-center gap-3 p-3">
               <FileText className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -101,7 +111,7 @@ export function DocumentPanel({ endpoint, documents, canEdit }: DocumentPanelPro
                   <Download />
                 </a>
               </Button>
-              {canEdit ? (
+              {(document.canDelete ?? canEdit) ? (
                 <Button
                   variant="ghost"
                   size="icon-sm"
@@ -118,14 +128,14 @@ export function DocumentPanel({ endpoint, documents, canEdit }: DocumentPanelPro
       <ConfirmDialog
         open={removing !== null}
         onOpenChange={(open) => (open ? undefined : setRemoving(null))}
-        title="Delete this document?"
+        title={`Delete this ${noun}?`}
         description={`“${removing?.name ?? ""}” will be deleted permanently.`}
-        confirmLabel="Delete document"
+        confirmLabel={`Delete ${noun}`}
         onConfirm={async () => {
           if (!removing) return;
           const response = await fetch(`${base}/${removing.id}`, { method: "DELETE" });
           if (!response.ok) throw new Error(await apiErrorMessage(response, "Delete"));
-          toast.success("Document deleted.");
+          toast.success(`${noun.charAt(0).toUpperCase()}${noun.slice(1)} deleted.`);
           setRemoving(null);
           router.refresh();
         }}

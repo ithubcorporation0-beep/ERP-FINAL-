@@ -359,3 +359,20 @@ amounts, so readers of the audit log (who may not be allowed to see pay) learn n
 kept on frozen payslips and in the ledger, which have their own permissions. Salary advances are recovered in full,
 oldest first, only while the net stays non-negative; splitting advances into instalments is left for later so the
 rule stays simple and predictable.
+
+## ADR-044: Kanban moves via status updates guarded by the expected status (phase 11)
+
+The board changes only a task's status (no manual ordering, so no rank column to rebalance); cards sort by priority
+and due date. Drag and drop uses the native HTML5 API (as the CRM pipeline does) and every card also has a "Move to"
+menu, because drag and drop isn't usable by keyboard, screen reader or touch users. A move updates the row only if it
+still has the status the user saw (`updateMany … where status = previous`), so concurrent moves fail with a clear
+409 instead of silently overwriting; the UI moves the card optimistically and reverts on failure.
+
+## ADR-045: Project and task visibility through the linked employee record (phase 11)
+
+People who manage projects (create/edit/delete) or tasks (`tasks:create` or `projects:edit`) see everything; everyone
+else sees projects they manage or have tasks in, and tasks assigned to them or in projects they manage, resolved
+through the employee record linked to their login. Filtering happens in the repositories' where-clauses, so pages,
+API, board, dashboard and reports agree, and records outside the scope are 404 rather than 403 (no existence leak).
+Employees with `tasks:edit` can move and attach to their own tasks, but only task managers edit, assign, create or
+delete tasks. Tasks of completed or cancelled projects are frozen until the project is reopened.

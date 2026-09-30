@@ -21,6 +21,8 @@ export type NavIconName =
   | "payroll"
   | "advances"
   | "projects"
+  | "tasks"
+  | "board"
   | "inventory"
   | "reports"
   | "users"
@@ -207,7 +209,28 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/projects",
         icon: "projects",
         permission: "projects:view",
-        description: "Projects, tasks and assignments.",
+        description: "Projects with customer, manager, budget, deadlines and progress.",
+      },
+      {
+        label: "Tasks",
+        href: "/projects/tasks",
+        icon: "tasks",
+        permission: "tasks:view",
+        description: "Tasks with assignees, priorities, deadlines and attachments.",
+      },
+      {
+        label: "Task board",
+        href: "/projects/board",
+        icon: "board",
+        permission: "tasks:view",
+        description: "Kanban board: move tasks between To do, In progress, Review and Completed.",
+      },
+      {
+        label: "Project reports",
+        href: "/projects/reports",
+        icon: "statements",
+        permission: "projects:view",
+        description: "Progress, deadlines and open work per person across projects.",
       },
       {
         label: "Inventory",
@@ -294,9 +317,17 @@ export function visibleNavSections(allowedHrefs: readonly string[]): NavSection[
   })).filter((section) => section.items.length > 0);
 }
 
-/** The nav item that owns a pathname (exact match or a sub-page of it). */
+/**
+ * The nav item that owns a pathname (exact match or a sub-page of it). The most specific item wins, so
+ * `/projects/tasks/…` belongs to "Tasks" rather than "Projects".
+ */
 export function findNavItem(pathname: string): NavItem | undefined {
-  return NAV_ITEMS.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
+  let best: NavItem | undefined;
+  for (const item of NAV_ITEMS) {
+    const matches = pathname === item.href || pathname.startsWith(`${item.href}/`);
+    if (matches && (!best || item.href.length > best.href.length)) best = item;
+  }
+  return best;
 }
 
 export function findNavSection(href: string): NavSection | undefined {

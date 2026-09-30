@@ -191,7 +191,13 @@ export const QUICK_ACTIONS: readonly QuickActionDefinition[] = [
     permission: "employees:create",
     href: "/hr/employees/new",
   },
-  { id: "createProject", label: "Create project", source: "projects", permission: "projects:create" },
+  {
+    id: "createProject",
+    label: "Create project",
+    source: "projects",
+    permission: "projects:create",
+    href: "/projects/new",
+  },
   { id: "addProduct", label: "Add product", source: "inventory", permission: "products:create" },
   {
     id: "recordPayment",

@@ -38,6 +38,9 @@ describe("navigation", () => {
       "/hr/attendance",
       "/hr/leave",
       "/projects",
+      "/projects/tasks",
+      "/projects/board",
+      "/projects/reports",
       "/notifications",
     ]);
     expect(visibleNavSections(hrefs).map((section) => section.title)).toEqual([
@@ -54,6 +57,10 @@ describe("navigation", () => {
     expect(findNavItem("/crm/customers/123/edit")?.label).toBe("Customers");
     expect(findNavItem("/crm/leads/pipeline")?.label).toBe("Leads");
     expect(findNavItem("/crm/customers-other")).toBeUndefined();
+    // The most specific item wins over a parent module.
+    expect(findNavItem("/projects/123")?.label).toBe("Projects");
+    expect(findNavItem("/projects/tasks/123/edit")?.label).toBe("Tasks");
+    expect(findNavItem("/projects/board")?.label).toBe("Task board");
   });
 
   it("lands each role on the first page it may open, or the profile page", () => {

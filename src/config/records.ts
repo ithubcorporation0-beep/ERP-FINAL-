@@ -15,6 +15,8 @@ export const RECORD_PREFIXES = {
   leave: "LV",
   payroll: "PRL",
   advance: "ADV",
+  project: "PRJ",
+  task: "TSK",
 } as const;
 export type RecordKind = keyof typeof RECORD_PREFIXES;
 
