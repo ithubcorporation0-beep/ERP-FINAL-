@@ -25,7 +25,7 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 | 10  | `feat(phase-10): implement payroll`                               | ✅     |
 | 11  | `feat(phase-11): implement projects tasks and kanban`             | ✅     |
 | 12  | `feat(phase-12): implement inventory suppliers and purchases`     | ✅     |
-| 13  | `feat(phase-13): implement notifications and audit logs`          | 🟡     |
+| 13  | `feat(phase-13): implement notifications and audit logging`       | ✅     |
 | 14  | `feat(phase-14): implement reports and exports`                   | ⬜     |
 | 15  | `feat(phase-15): implement customer portal and advanced features` | ⬜     |
 | 16  | `feat(phase-16): production hardening and Vercel deployment`      | ⬜     |
@@ -180,7 +180,7 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
 - ✅ Record-level visibility (employees see their own work), permission checks on every page/action/API route,
   audit log for every change; dashboard figures, chart and feed; project reports
 - Not in scope (documented in `docs/projects.md`): budget vs. actual cost, time tracking, dependencies, Gantt,
-  notifications
+  notifications (added in phase 13)
 
 ## Phase 12 — Inventory and purchasing
 
@@ -193,13 +193,21 @@ Status legend: ✅ done · 🟡 partially done / scaffolded · ⬜ not started
   supplier invoice (posts to Accounts Payable) → payment (partial, void); AP report includes supplier bills
 - ✅ New built-in role Inventory Manager; permission checks, audit log, tenant isolation tests
 - Not in scope (documented in `docs/inventory.md`): stock from sales invoices, COGS/FIFO costing, serial/batch,
-  supplier returns, low-stock notifications
+  supplier returns, low-stock notifications (added in phase 13)
 
 ## Phase 13 — Notifications and audit logs
 
-- ✅ `writeAuditLog` helper, used by customers
-- ⬜ In-app notifications (bell, mark read), email notifications
-- ⬜ Audit log viewer with filters
+- ✅ Notification types: new invoice, invoice overdue, payment received, new task, task deadline, leave request,
+  leave decision, low inventory, new customer, project deadline — sent in the event's transaction, never to the actor
+- ✅ In-app notifications: header bell with unread count and dropdown, notification center (filters, read/unread,
+  mark all), per-user preferences (in-app / email per type)
+- ✅ Email notifications through a transactional outbox with retries; scheduled reminders (cron route with
+  `CRON_SECRET` or `npm run notifications:run`), deduplicated
+- ✅ Audit log: login/logout in the company, create/update/delete, approve/reject, payments, invoice changes, with
+  user, entity, company, IP and user agent; append-only (database trigger)
+- ✅ Audit log viewer for `audit-logs:view`: search, filters (area, record type, user, dates), detail page, CSV export
+- Not in scope (documented in `docs/notifications.md`): WhatsApp / SMS (designed as outbox channels), push and
+  real-time updates, digests, retention
 
 ## Phase 14 — Reports and exports
 

@@ -15,11 +15,6 @@ async function signedIn(browser: Browser, email: string, password: string): Prom
   return page;
 }
 
-async function choose(page: Page, label: string | RegExp, option: string | RegExp) {
-  await page.getByRole("combobox", { name: label }).click();
-  await page.getByRole("option", { name: option }).first().click();
-}
-
 /** A month far in the future, different on every run (a month can only be processed once). */
 function uniqueMonth(): string {
   const seconds = Math.floor(Date.now() / 1000);

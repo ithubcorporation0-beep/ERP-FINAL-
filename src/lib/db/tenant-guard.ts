@@ -53,6 +53,8 @@ export const TENANT_MODELS: ReadonlySet<string> = new Set([
   "SupplierInvoice",
   "SupplierPayment",
   "Notification",
+  "NotificationPreference",
+  "EmailOutbox",
   "AuditLog",
 ]);
 

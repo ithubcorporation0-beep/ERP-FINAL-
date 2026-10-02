@@ -14,6 +14,8 @@ describe("tenant guard (assertTenantScoped)", () => {
         "Lead",
         "Membership",
         "Notification",
+        "NotificationPreference",
+        "EmailOutbox",
         "NumberSequence",
         "Quotation",
         "QuotationItem",

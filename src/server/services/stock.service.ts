@@ -3,7 +3,15 @@ import { formatRecordNumber } from "@/config/records";
 import { dateOnlyToDate } from "@/lib/date-range";
 import { db } from "@/lib/db";
 import { NotFoundError, ValidationError } from "@/lib/errors";
-import { adjustmentDelta, compareQuantity, negateQuantity, quantity, trimQuantity } from "@/lib/inventory";
+import {
+  adjustmentDelta,
+  compareQuantity,
+  isLowStock,
+  negateQuantity,
+  quantity,
+  sumQuantities,
+  trimQuantity,
+} from "@/lib/inventory";
 import { money } from "@/lib/money";
 import { authorize, type TenantContext } from "@/lib/tenant";
 import type { StockMovementListQuery, StockOperationInput } from "@/lib/validation";
@@ -12,6 +20,7 @@ import { numberSequenceRepository } from "@/server/repositories/number-sequence.
 import { productRepository } from "@/server/repositories/product.repository";
 import { stockRepository, type StockMovementData } from "@/server/repositories/stock.repository";
 import { writeAuditLog } from "./audit.service";
+import { notify } from "./notification.service";
 import { warehouseService } from "./warehouse.service";
 
 /**
@@ -87,6 +96,10 @@ export const stockService = {
     return db.$transaction(async (tx) => {
       if (!(await productRepository.lock(ctx.companyId, product.id, tx))) throw new NotFoundError("Product");
       const onHand = quantity(await stockRepository.onHand(ctx.companyId, product.id, warehouse.id, tx));
+      const totalBefore = quantity(
+        (await stockRepository.totals(ctx.companyId, { productIds: [product.id] }, tx)).get(product.id) ??
+          "0",
+      );
       const movements: StockMovementData[] = [];
       let summary: string;
 
@@ -158,6 +171,26 @@ export const stockService = {
         },
         tx,
       );
+      // Low-inventory alert when this movement takes the product (all warehouses) to or below its minimum.
+      const minimum = quantity(product.minimumStock);
+      const totalAfter = sumQuantities([
+        totalBefore,
+        ...written.map((movement) => quantity(movement.quantity)),
+      ]);
+      if (!isLowStock(totalBefore, minimum) && isLowStock(totalAfter, minimum)) {
+        await notify(
+          ctx.companyId,
+          {
+            type: "inventory.low_stock",
+            title: `Low stock: ${product.name}`,
+            body: `${product.sku}: ${trimQuantity(totalAfter)} ${product.unit} left (minimum ${trimQuantity(minimum)}).`,
+            link: `/inventory/products/${product.id}`,
+            entityType: "Product",
+            entityId: product.id,
+          },
+          tx,
+        );
+      }
       return written;
     });
   },

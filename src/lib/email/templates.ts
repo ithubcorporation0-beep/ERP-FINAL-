@@ -40,6 +40,15 @@ export interface SalesDocumentEmail {
 }
 
 export const emailTemplates = {
+  /** An ERP notification from the email outbox: the stored subject and paragraphs, and a link into the app. */
+  notification: (to: string, message: { subject: string; paragraphs: string[]; url?: string | null }) =>
+    layout(
+      to,
+      message.subject,
+      message.paragraphs,
+      message.url ? { label: "Open in IT Hub ERP", url: message.url } : undefined,
+    ),
+
   /** A quotation or invoice sent to a customer; the PDF is attached by the caller. */
   salesDocument: (to: string, doc: SalesDocumentEmail) =>
     layout(to, `${doc.documentLabel} ${doc.code} from ${doc.companyName}`, [

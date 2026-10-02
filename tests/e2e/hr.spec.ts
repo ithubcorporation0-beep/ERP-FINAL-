@@ -74,6 +74,8 @@ test("an employee checks in and requests leave; an approver approves it", async 
 
   const employee = await signedIn(browser, E2E_USERS.employee.email, E2E_PASSWORD);
   await employee.goto("/hr/attendance");
+  // The card streams in after the page loads; wait for it before deciding whether to check in.
+  await expect(employee.getByRole("heading", { name: "My attendance today" })).toBeVisible();
   const checkIn = employee.getByRole("button", { name: "Check in" });
   if (await checkIn.isVisible()) {
     await checkIn.click();

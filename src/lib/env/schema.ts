@@ -65,6 +65,18 @@ const baseSchema = z.object({
    * base64-encoded (`openssl rand -base64 32`). Required in production. Changing it makes stored values unreadable.
    */
   DATA_ENCRYPTION_KEY: optional,
+
+  /**
+   * Shared secret for the scheduler endpoint POST /api/cron/notifications (overdue and deadline reminders, email
+   * delivery). Send it as "Authorization: Bearer <secret>". Without it the endpoint is disabled; use
+   * `npm run notifications:run` instead. At least 32 characters.
+   */
+  CRON_SECRET: z
+    .string()
+    .trim()
+    .min(32, "CRON_SECRET must be at least 32 characters")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
 });
 
 export const serverEnvSchema = baseSchema

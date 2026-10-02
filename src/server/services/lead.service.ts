@@ -10,6 +10,7 @@ import { leadRepository, type LeadData, type LeadFilters } from "@/server/reposi
 import { membershipRepository } from "@/server/repositories/membership.repository";
 import { numberSequenceRepository } from "@/server/repositories/number-sequence.repository";
 import { writeAuditLog } from "./audit.service";
+import { notify } from "./notification.service";
 import { recordHistory, snapshotText } from "./record-history";
 
 /** Cards per pipeline column; the column header still shows the full count and value. */
@@ -231,6 +232,19 @@ export const leadService = {
           entityId: customer.id,
           after: customer,
           metadata: { fromLead: leadCode, leadId: id },
+        },
+        tx,
+      );
+      await notify(
+        ctx.companyId,
+        {
+          type: "customer.created",
+          title: `New customer: ${customer.name}`,
+          body: `Converted from lead ${leadCode}.`,
+          link: `/crm/customers/${customer.id}`,
+          entityType: "Customer",
+          entityId: customer.id,
+          excludeUserIds: [ctx.userId],
         },
         tx,
       );

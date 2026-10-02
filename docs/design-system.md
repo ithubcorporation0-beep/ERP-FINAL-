@@ -84,18 +84,18 @@ so digits line up.
 
 `src/components/layout/`
 
-| Component             | What it does                                                                             |
-| --------------------- | ---------------------------------------------------------------------------------------- |
-| `AppShell`            | Frame for every signed-in page: skip link, sidebar, header, breadcrumbs, content area    |
-| `Sidebar`             | Desktop navigation (≥ lg), sticky, scrolls independently                                 |
-| `SidebarNav`          | Grouped links with the active page highlighted (`aria-current="page"`)                   |
-| `MobileNav`           | Menu button + slide-out sheet with the same navigation (< lg); closes after navigating   |
-| `Header`              | Logo (mobile), current company, global search, notifications, user menu                  |
-| `GlobalSearch`        | Ctrl/⌘ + K command palette. Searches pages today; record search arrives with each module |
-| `NotificationsButton` | Bell with the **real** unread count for the signed-in user                               |
-| `UserMenu`            | Name, email, company, Settings, theme switch, sign out                                   |
-| `Breadcrumbs`         | "Section › Page" derived from the URL; detail pages can pass their own `items`           |
-| `Logo`                | Brand mark (placeholder "IH" mark until a real logo asset exists)                        |
+| Component             | What it does                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| `AppShell`            | Frame for every signed-in page: skip link, sidebar, header, breadcrumbs, content area      |
+| `Sidebar`             | Desktop navigation (≥ lg), sticky, scrolls independently                                   |
+| `SidebarNav`          | Grouped links with the active page highlighted (`aria-current="page"`)                     |
+| `MobileNav`           | Menu button + slide-out sheet with the same navigation (< lg); closes after navigating     |
+| `Header`              | Logo (mobile), current company, global search, notifications, user menu                    |
+| `GlobalSearch`        | Ctrl/⌘ + K command palette. Searches pages today; record search arrives with each module   |
+| `NotificationsButton` | Bell with the **real** unread count; dropdown with the latest items and "Mark all as read" |
+| `UserMenu`            | Name, email, company, Settings, theme switch, sign out                                     |
+| `Breadcrumbs`         | "Section › Page" derived from the URL; detail pages can pass their own `items`             |
+| `Logo`                | Brand mark (placeholder "IH" mark until a real logo asset exists)                          |
 
 Navigation is defined once in `src/config/navigation.ts` (sections, labels, icons, descriptions and
 the permission each item needs). The server filters it by the user's role, so people only see

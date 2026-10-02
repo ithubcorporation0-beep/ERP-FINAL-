@@ -130,6 +130,23 @@ Rules: `docs/inventory.md`. Stock is never written directly — only through `PO
 | GET / POST                     | `/api/purchases/payments` / pay `{ invoiceId, amount, method, paymentDate, … }` (B3)                                | `purchases:view` / `accounting:create`                                         |
 | POST                           | `/api/purchases/payments/:id/void` `{ reason }` (B4)                                                                | `accounting:edit`                                                              |
 
+## Notifications and audit logs (phase 13)
+
+Rules: `docs/notifications.md`, `docs/audit-logs.md`. Notifications are always the signed-in user's own.
+
+| Method    | Path                                                                                           | Permission                         |
+| --------- | ---------------------------------------------------------------------------------------------- | ---------------------------------- |
+| GET       | `/api/notifications?status=unread&type=&page=&pageSize=`                                       | signed-in member                   |
+| PATCH     | `/api/notifications` `{ ids: [...], read: true\|false }` or `{ all: true }`                    | signed-in member                   |
+| GET       | `/api/notifications/recent` (latest items + unread count, for the bell)                        | signed-in member                   |
+| GET / PUT | `/api/notifications/preferences` / `{ preferences: [{ type, inApp, email }] }`                 | signed-in member                   |
+| GET       | `/api/audit-logs?search=&action=&entityType=&actorId=&from=&to=&page=&pageSize=`               | `audit-logs:view`                  |
+| GET       | `/api/audit-logs/:id`                                                                          | `audit-logs:view`                  |
+| GET       | `/api/audit-logs/export?…same filters` (CSV, max 5,000 rows; audited)                          | `audit-logs:export`                |
+| POST      | `/api/cron/notifications` with `Authorization: Bearer <CRON_SECRET>` (404 when not configured) | scheduler secret (no user session) |
+
+Audit routes are read-only: other methods get 405.
+
 ## Planned
 
 reports and exports. See `MASTER-ERP-BUILD-PLAN.md`.

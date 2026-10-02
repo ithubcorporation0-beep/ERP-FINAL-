@@ -38,8 +38,8 @@ export async function loginAction(input: unknown, next?: string | null): Promise
 
 export async function logoutAction(): Promise<void> {
   const info = await requestClientInfo();
-  const userId = await destroySession();
-  if (userId) await authService.recordLogout(userId, info);
+  const ended = await destroySession();
+  if (ended) await authService.recordLogout(ended.userId, info, ended.activeCompanyId);
   redirect("/login");
 }
 

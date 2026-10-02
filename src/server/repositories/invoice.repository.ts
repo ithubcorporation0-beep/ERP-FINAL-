@@ -206,6 +206,28 @@ export const invoiceRepository = {
     return client.invoice.updateMany({ where: { id, companyId }, data: { ...data, ...updatedBy(actorId) } });
   },
 
+  /** Issued, unpaid invoices due before `today` (overdue reminders). */
+  listOverdue(companyId: string, today: Date, client: DbClient = db) {
+    return client.invoice.findMany({
+      where: {
+        companyId,
+        deletedAt: null,
+        status: { in: ["SENT", "PARTIALLY_PAID"] },
+        dueDate: { lt: today },
+      },
+      select: {
+        id: true,
+        code: true,
+        dueDate: true,
+        total: true,
+        amountPaid: true,
+        currency: true,
+        customer: { select: { name: true } },
+      },
+      take: 500,
+    });
+  },
+
   listForCustomer(companyId: string, customerId: string, client: DbClient = db) {
     return client.invoice.findMany({
       where: { companyId, customerId, deletedAt: null },

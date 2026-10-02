@@ -187,6 +187,28 @@ export const taskRepository = {
     });
   },
 
+  /** Open, assigned tasks of open projects due on or before `until` (deadline reminders). */
+  listDueForReminder(companyId: string, until: Date, client: DbClient = db) {
+    return client.task.findMany({
+      where: {
+        companyId,
+        deletedAt: null,
+        status: { in: OPEN },
+        dueDate: { lte: until },
+        project: { deletedAt: null, status: { in: ["PLANNING", "ACTIVE", "ON_HOLD"] } },
+      },
+      select: {
+        id: true,
+        number: true,
+        name: true,
+        dueDate: true,
+        assignee: { select: { userId: true } },
+        project: { select: { name: true, manager: { select: { userId: true } } } },
+      },
+      take: 1000,
+    });
+  },
+
   countOpen(companyId: string, scope: TaskScope, client: DbClient = db) {
     return client.task.count({
       where: {

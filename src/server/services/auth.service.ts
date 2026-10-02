@@ -115,11 +115,14 @@ export const authService = {
     }
 
     await userRepository.recordSuccessfulLogin(user.id);
+    // Recorded in the company the user lands in, so that company's audit log shows the sign-in.
+    const access = await membershipRepository.findAccess(user.id);
     await recordAuditEvent({
       action: "auth.login",
       entityType: "User",
       entityId: user.id,
       actorId: user.id,
+      companyId: access?.companyId ?? null,
       ...info,
     });
     return { ok: true, user: { id: user.id, name: user.name, email: user.email } };
@@ -131,12 +134,15 @@ export const authService = {
     return landingPath(access?.permissions ?? []);
   },
 
-  async recordLogout(userId: string, info: RequestInfo = {}) {
+  /** Records a sign-out in the company the user was working in (`activeCompanyId` of the session, if still valid). */
+  async recordLogout(userId: string, info: RequestInfo = {}, activeCompanyId?: string | null) {
+    const access = await membershipRepository.findAccess(userId, activeCompanyId ?? undefined);
     await recordAuditEvent({
       action: "auth.logout",
       entityType: "User",
       entityId: userId,
       actorId: userId,
+      companyId: access?.companyId ?? null,
       ...info,
     });
   },

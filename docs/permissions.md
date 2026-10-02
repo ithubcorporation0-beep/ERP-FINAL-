@@ -245,6 +245,18 @@ found". See `docs/projects.md`.
 
 A requester without `purchases:view` sees only their own purchase requests. See `docs/inventory.md`.
 
+## Notifications and audit logs
+
+| Action                                                         | Permission                                           | Built-in roles (besides Super Admin / Admin) |
+| -------------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------- |
+| Own notifications: bell, `/notifications`, mark read, settings | any member (none)                                    | everyone                                     |
+| Receive a broadcast type (e.g. new invoice, low stock)         | the type's view permission (`docs/notifications.md`) | depends on the type                          |
+| Search, filter and open audit entries                          | `audit-logs:view`                                    | — (Super Admin and Admin only)               |
+| Export audit entries as CSV (the export is audited)            | `audit-logs:export`                                  | — (Super Admin and Admin only)               |
+
+Nobody can change or delete audit entries: there is no permission for it, no route, and the database refuses it.
+Users only ever see their own notifications. See `docs/notifications.md` and `docs/audit-logs.md`.
+
 ## Dashboard widgets
 
 The dashboard needs `dashboard:view`; each widget additionally needs any one of its permissions in

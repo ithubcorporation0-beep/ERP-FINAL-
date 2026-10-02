@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { requestClientInfo } from "@/lib/auth/request";
 import { getCurrentSession, getCurrentUser, type SessionUser } from "@/lib/auth/session";
 import { ForbiddenError, UnauthenticatedError } from "@/lib/errors";
 import { PERMISSION_KEYS, hasPermission, isPermissionKey, type PermissionKey } from "@/lib/permissions";
@@ -11,6 +12,8 @@ export interface TenantContext {
   roleId: string;
   roleName: string;
   permissions: string[];
+  /** The request's client (IP address, user agent) for the audit log; absent outside a web request. */
+  client?: { ipAddress?: string; userAgent?: string };
 }
 
 /** The signed-in user (no company needed — e.g. the profile page). Throws UnauthenticatedError. */
@@ -39,6 +42,7 @@ const resolveTenant = cache(async (): Promise<TenantContext> => {
     roleId: access.roleId,
     roleName: access.roleName,
     permissions: access.permissions,
+    client: await requestClientInfo(),
   };
 });
 

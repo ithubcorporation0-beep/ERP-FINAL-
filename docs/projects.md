@@ -97,5 +97,4 @@ projects.
 - Budget vs. actual cost (expenses and time aren't linked to projects), invoicing from projects.
 - Time tracking / timesheets, task dependencies, sub-tasks, milestones, Gantt chart, recurring tasks.
 - Manual card ordering within a board column; comments on tasks.
-- Notifications or emails on assignment and due dates (phase 13).
 - Customer portal view of project status (phase 15).

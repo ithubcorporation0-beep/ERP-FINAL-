@@ -23,6 +23,8 @@ required variable is missing or malformed, and prints which one — values are n
 | `STORAGE_LOCAL_DIR`                                                                                | no               | Folder for `local` storage (default `.storage`)                                                                                 |
 | `DATA_ENCRYPTION_KEY`                                                                              | yes (production) | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts employee bank details; back it up — without it they can't be read |
 
+| `CRON_SECRET` | no | At least 32 random characters (`openssl rand -hex 32`). Enables `POST /api/cron/notifications` for reminders and notification emails |
+
 `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` are only used by `npm run db:seed`, never by the running app.
 
 ## Sending quotations and invoices
@@ -30,6 +32,17 @@ required variable is missing or malformed, and prints which one — values are n
 Documents are emailed with `EMAIL_TRANSPORT=smtp` (the PDF is attached; replies go to the company email from
 Settings). WhatsApp sharing needs no configuration: it opens WhatsApp with a link to `APP_URL/api/share/<token>`,
 so `APP_URL` must be the public address customers can reach.
+
+## Scheduled notifications
+
+Overdue-invoice and deadline reminders, and the delivery of notification emails, run on a schedule
+(`docs/notifications.md`). Run it every 5–15 minutes with either:
+
+- an HTTP cron (Vercel Cron, GitHub Actions, any cron service):
+  `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://erp.example.com/api/cron/notifications`
+- or, on a server with the code and database access: `npm run notifications:run` from a crontab.
+
+Without a scheduler, in-app notifications for events still work; reminders and emails wait until the next run.
 
 ## Generic Node.js host
 

@@ -12,8 +12,10 @@ import { employeeRepository } from "@/server/repositories/employee.repository";
 import { numberSequenceRepository } from "@/server/repositories/number-sequence.repository";
 import { projectRepository } from "@/server/repositories/project.repository";
 import { taskAttachmentRepository } from "@/server/repositories/task-attachment.repository";
+import type { DbClient } from "@/server/repositories/helpers";
 import { taskRepository, type TaskScope } from "@/server/repositories/task.repository";
 import { writeAuditLog } from "./audit.service";
+import { notify } from "./notification.service";
 import { ownEmployee } from "./hr-shared";
 import { projectScope } from "./project.service";
 import { recordHistory, snapshotText } from "./record-history";
@@ -65,6 +67,25 @@ function assertProjectOpen(task: { project: { status: string } }) {
   if (!OPEN_PROJECT_STATUSES.some((status) => status === task.project.status)) {
     throw new ConflictError("The project is completed or cancelled. Reopen it to change its tasks.");
   }
+}
+
+/** Tells the assignee (through their login) about a task assigned to them — not when they assigned it themselves. */
+function notifyAssignee(ctx: TenantContext, task: Task, client: DbClient) {
+  const userId = task.assignee?.userId;
+  if (!userId || userId === ctx.userId) return Promise.resolve();
+  return notify(
+    ctx.companyId,
+    {
+      type: "task.assigned",
+      title: `New task: ${task.name}`,
+      body: `${formatRecordNumber("task", task.number)} in ${task.project.name}${task.dueDate ? `, due ${dateToDateOnly(task.dueDate)}` : ""}.`,
+      link: `/projects/tasks/${task.id}`,
+      entityType: "Task",
+      entityId: task.id,
+      userIds: [userId],
+    },
+    client,
+  );
 }
 
 const HISTORY_ACTIONS: Record<string, string> = {
@@ -183,6 +204,7 @@ export const taskService = {
         { action: "task.create", entityType: "Task", entityId: task.id, after: snapshot(task) },
         tx,
       );
+      await notifyAssignee(ctx, task, tx);
       return task;
     });
   },
@@ -211,6 +233,7 @@ export const taskService = {
         },
         tx,
       );
+      if (after.assigneeId && after.assigneeId !== before.assigneeId) await notifyAssignee(ctx, after, tx);
     });
   },
 
@@ -280,6 +303,10 @@ export const taskService = {
         },
         tx,
       );
+      if (assigneeId) {
+        const assigned = await taskRepository.findById(ctx.companyId, id, {}, tx);
+        if (assigned) await notifyAssignee(ctx, assigned, tx);
+      }
     });
   },
 

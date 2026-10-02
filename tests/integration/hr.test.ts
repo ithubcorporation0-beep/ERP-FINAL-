@@ -321,7 +321,7 @@ describe("attendance", () => {
 
     const records = await attendanceService.list(
       owner,
-      attendanceListQuerySchema.parse({ employeeId: employee.id }),
+      attendanceListQuerySchema.parse({ employeeId: employee.id, range: "last-3-months" }),
     );
     const byDate = Object.fromEntries(
       records.items.map((item) => [item.date.toISOString().slice(0, 10), item]),

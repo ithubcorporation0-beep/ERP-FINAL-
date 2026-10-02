@@ -12,6 +12,7 @@ import { invoiceRepository } from "@/server/repositories/invoice.repository";
 import { numberSequenceRepository } from "@/server/repositories/number-sequence.repository";
 import { paymentRepository } from "@/server/repositories/payment.repository";
 import { writeAuditLog } from "./audit.service";
+import { notify } from "./notification.service";
 import { ledgerService } from "./ledger.service";
 import { invoiceBalance } from "./invoice.service";
 import { salesContext } from "./sales-shared";
@@ -137,6 +138,19 @@ export const paymentService = {
             summary: `${code}: ${amount} by ${PAYMENT_METHOD_LABELS[input.method].toLowerCase()}`,
             paymentId: payment.id,
           },
+        },
+        tx,
+      );
+      await notify(
+        ctx.companyId,
+        {
+          type: "payment.received",
+          title: `Payment received for ${invoice.code}`,
+          body: `${invoice.customer.name} paid ${invoice.currency} ${amount} by ${PAYMENT_METHOD_LABELS[input.method].toLowerCase()} (${code}).`,
+          link: `/sales/invoices/${invoice.id}`,
+          entityType: "Payment",
+          entityId: payment.id,
+          excludeUserIds: [ctx.userId],
         },
         tx,
       );

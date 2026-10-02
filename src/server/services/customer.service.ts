@@ -8,6 +8,7 @@ import { customerRepository, type CustomerData } from "@/server/repositories/cus
 import { leadRepository } from "@/server/repositories/lead.repository";
 import { numberSequenceRepository } from "@/server/repositories/number-sequence.repository";
 import { writeAuditLog } from "./audit.service";
+import { notify } from "./notification.service";
 import { recordHistory, snapshotText } from "./record-history";
 
 /**
@@ -102,6 +103,19 @@ export const customerService = {
       await writeAuditLog(
         ctx,
         { action: "customer.create", entityType: "Customer", entityId: customer.id, after: customer },
+        tx,
+      );
+      await notify(
+        ctx.companyId,
+        {
+          type: "customer.created",
+          title: `New customer: ${customer.name}`,
+          body: formatRecordNumber("customer", customer.number),
+          link: `/crm/customers/${customer.id}`,
+          entityType: "Customer",
+          entityId: customer.id,
+          excludeUserIds: [ctx.userId],
+        },
         tx,
       );
       return customer;

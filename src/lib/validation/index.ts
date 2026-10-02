@@ -30,6 +30,7 @@ import {
   STOCK_OPERATIONS,
   SUPPLIER_INVOICE_STATUSES,
 } from "@/config/inventory";
+import { NOTIFICATION_TYPES } from "@/config/notifications";
 import { PROJECT_STATUSES, TASK_PRIORITIES, TASK_STATUSES } from "@/config/projects";
 import { DATE_RANGE_PRESETS, DEFAULT_DATE_RANGE } from "@/lib/date-range";
 import { isCountryCode, isCurrencyCode, isLocale, isTimeZone } from "@/lib/intl";
@@ -869,6 +870,46 @@ export const supplierPaymentListQuerySchema = paginationSchema.extend({
   supplierId: idSchema.optional().catch(undefined),
 });
 
+// ─── Notifications and audit logs ───
+
+export const notificationListQuerySchema = paginationSchema.extend({
+  status: z.enum(["unread"]).optional().catch(undefined),
+  type: listFilter(NOTIFICATION_TYPES),
+});
+
+/** Mark some notifications (ids) or all of the user's notifications as read / unread. */
+export const notificationReadSchema = z.union([
+  z.object({ ids: z.array(idSchema).min(1).max(200), read: z.boolean() }),
+  z.object({ all: z.literal(true) }),
+]);
+
+export const notificationPreferencesSchema = z.object({
+  preferences: z
+    .array(z.object({ type: z.enum(NOTIFICATION_TYPES), inApp: z.boolean(), email: z.boolean() }))
+    .min(1)
+    .max(NOTIFICATION_TYPES.length),
+});
+
+/** Audit log viewer filters. Unknown values from a hand-edited URL are ignored. */
+export const auditLogQuerySchema = paginationSchema.extend({
+  /** Action prefix or exact action, e.g. "invoice" or "invoice.cancel". */
+  action: z
+    .string()
+    .trim()
+    .regex(/^[a-z_]+(\.[a-z_]+)?$/)
+    .optional()
+    .catch(undefined),
+  entityType: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]+$/)
+    .optional()
+    .catch(undefined),
+  actorId: idSchema.optional().catch(undefined),
+  from: z.iso.date().optional().catch(undefined),
+  to: z.iso.date().optional().catch(undefined),
+});
+
 export const loginSchema = z.object({
   email: z.email("Enter a valid email address.").toLowerCase(),
   password: z.string().min(1, "Enter your password.").max(200),
@@ -1018,6 +1059,9 @@ export type ProjectInput = z.infer<typeof projectSchema>;
 export type ProjectListQuery = z.infer<typeof projectListQuerySchema>;
 export type TaskInput = z.infer<typeof taskSchema>;
 export type TaskListQuery = z.infer<typeof taskListQuerySchema>;
+export type NotificationListQuery = z.infer<typeof notificationListQuerySchema>;
+export type NotificationPreferencesInput = z.infer<typeof notificationPreferencesSchema>;
+export type AuditLogQuery = z.infer<typeof auditLogQuerySchema>;
 export type ProductCategoryInput = z.infer<typeof productCategorySchema>;
 export type WarehouseInput = z.infer<typeof warehouseSchema>;
 export type ProductInput = z.infer<typeof productSchema>;

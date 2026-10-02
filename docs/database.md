@@ -3,7 +3,7 @@
 PostgreSQL (15+, developed on 16) through **Prisma 7**. Schema: `prisma/schema.prisma`.
 Prisma settings (connection URL, migrations folder, seed command): `prisma.config.ts`.
 
-## What exists today (phases 02–10)
+## What exists today (phases 02–13)
 
 The **core platform** tables. ERP module tables (invoices, employees, stock, …) are added by the
 phase that builds each module, so every table is designed with its real requirements.
@@ -46,7 +46,7 @@ companies ──┬── memberships ── users ──┬── sessions
 | `role_permissions`               | `company_id`                               | Which permissions a role has                                                                                                                                                   |
 | `memberships`                    | `company_id`                               | A user's access to a company, with exactly one role there                                                                                                                      |
 | `settings`                       | `company_id`                               | Validated per-company preferences (key → JSON value)                                                                                                                           |
-| `audit_logs`                     | `company_id` (null for sign-in events)     | Immutable history of important actions                                                                                                                                         |
+| `audit_logs`                     | `company_id` (null for sign-in events)     | Immutable history of important actions: actor, action, entity, before/after, IP and user agent. **Append-only** (trigger)                                                      |
 | `customers`                      | `company_id`                               | CRM customers (reference module): `number` (Customer ID), contact details, WhatsApp, city, country, tax number, type, status, notes; soft delete                               |
 | `customer_documents`             | `company_id`                               | Files attached to a customer: cleaned name, storage key, detected content type, size                                                                                           |
 | `customer_communications`        | `company_id`                               | Communication log and notes on a customer: channel, direction, subject, body, when                                                                                             |
@@ -83,7 +83,9 @@ companies ──┬── memberships ── users ──┬── sessions
 | `goods_receipts` (+ `_items`)    | `company_id`                               | Goods received (`number` = GRN-0001) against an order: date, warehouse, note; lines per order line and product                                                                 |
 | `supplier_invoices`              | `company_id`                               | Bills (`number` = BILL-0001): supplier, order, supplier's number, dates, subtotal, tax, total, amount paid, status                                                             |
 | `supplier_payments`              | `company_id`                               | Payments to suppliers (`number` = SPAY-0001) against a bill: amount, method, date, reference; voided with a reason, never deleted                                              |
-| `notifications`                  | `company_id`                               | In-app notifications (the header bell)                                                                                                                                         |
+| `notifications`                  | `company_id`                               | In-app notifications (header bell, `/notifications`): user, type, title, body, link, entity, read at, dedupe key (unique per user)                                             |
+| `notification_preferences`       | `company_id`                               | Per user and type: in-app and email on/off (missing row = the type's defaults)                                                                                                 |
+| `email_outbox`                   | `company_id`                               | Queued notification emails: recipient, subject, body, link, status (pending/sent/failed), attempts, next attempt, last error                                                   |
 
 ## Conventions
 
@@ -104,15 +106,16 @@ Company data is protected at several levels (overview in `docs/architecture.md` 
 
 1. **Schema:** `company_id` on every company-owned table (`roles`, `role_permissions`, `memberships`, `settings`,
    `customers`, `customer_documents`, `customer_communications`, `leads`, `number_sequences`, `quotations`,
-   `quotation_items`, `invoices`, `invoice_items`, `payments`, `share_links`, `notifications`, `audit_logs`), with composite foreign keys for children (a document, note or converted lead can only point at a
+   `quotation_items`, `invoices`, `invoice_items`, `payments`, `share_links`, `notifications`, `notification_preferences`, `email_outbox`, `audit_logs`, and every module table added since), with composite foreign keys for children (a document, note or converted lead can only point at a
    customer of the same company — the database refuses anything else).
 2. **Repositories:** every function takes `companyId` first and filters by it, including `updateMany` / `deleteMany`
    (a guessed id of another company updates or deletes **0 rows**).
 3. **Tenant guard** (`src/lib/db/tenant-guard.ts`): a Prisma client extension on the shared `db` client that throws
    `TenantScopeError` for any query on those tables whose `where` (or insert data) has no `companyId` — including
    inside transactions. It checks top-level `companyId` and compound unique keys such as `companyId_name`.
-   Intentional cross-company queries are wrapped in `crossTenant("reason", () => …)`; today there are three, all
-   about a user's _own_ memberships (default company, company switcher list, activating invitations).
+   Intentional cross-company queries are wrapped in `crossTenant("reason", () => …)`, in repositories only: a user's
+   _own_ memberships (default company, company switcher list, activating invitations), the public share-link lookup,
+   and the email dispatcher (`emailOutboxRepository`), which delivers queued emails of every company.
 
 Not covered by the guard (review these by hand): raw SQL (`$queryRaw`, `$executeRaw`) and nested relation queries
 (they are reached through an already-scoped parent). Raw SQL is used only where Prisma can't express the query
@@ -121,7 +124,8 @@ Not covered by the guard (review these by hand): raw SQL (`$queryRaw`, `$execute
 `sumIssuedByMonth`; `journalRepository.monthlyByType`, ledger totals per month; `employeeRepository.lock`, `SELECT … FOR UPDATE`
 before the leave overlap check; `payrollRepository.lockRun` before every change to a payroll run; `productRepository.lock`,
 `purchaseOrderRepository.lock` and `supplierInvoiceRepository.lock` before stock-reducing movements, goods receipts
-and supplier payments); it always filters
+and supplier payments; `emailOutboxRepository.claimDue`, `SELECT id … FOR UPDATE SKIP LOCKED` across companies for
+the dispatcher — it reads only ids and status, then loads the rows through `crossTenant`); it always filters
 `company_id = ${companyId}` explicitly, uses tagged-template parameters (never string concatenation), validates the
 rows with Zod, and has an isolation test. PostgreSQL row-level security can be added later as a sixth
 layer (see ADR-024).
@@ -226,3 +230,5 @@ Integration tests (`tests/integration`) run against **PostgreSQL, not mocks**:
 | `20261001100100_projects_integrity`            | Phase 11: CHECKs — project end ≥ start, budget ≥ 0, completed ⇔ `completed_at`; task due ≥ start, completed ⇔ `completed_at`.                                                                                                                                                                                            |
 | `20261002100000_inventory_and_purchasing`      | Phase 12: stock movement and purchasing enums; `product_categories`, `warehouses`, `products`, `stock_movements`, `suppliers`, `purchase_requests` (+ items), `purchase_orders` (+ items), `goods_receipts` (+ items), `supplier_invoices`, `supplier_payments`.                                                         |
 | `20261002100100_inventory_integrity`           | Phase 12: CHECKs — prices, minimum stock ≥ 0; movement quantity ≠ 0 and sign matches type; transfer/receipt links; order and bill amounts; **bill total = subtotal + tax**; paid within total; cancelled ⇔ date. Triggers `stock_movements_append_only` and `stock_movements_no_negative_stock`.                         |
+| `20261003100000_notifications_and_audit`       | Phase 13: notification type, entity and dedupe key; `notification_preferences`; `email_outbox` (+ enums); audit log index on (company, action).                                                                                                                                                                          |
+| `20261003100100_audit_log_immutable`           | Phase 13: trigger `audit_logs_append_only` refuses UPDATE and DELETE on `audit_logs` (except the FK clearing a deleted user); CHECKs on outbox attempts and sent time.                                                                                                                                                   |

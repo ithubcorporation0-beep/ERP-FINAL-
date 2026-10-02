@@ -58,7 +58,8 @@ below that minimum (this includes out of stock). Products with minimum 0 never a
 Low stock shows as: the dashboard figure "Low stock items", a banner on the products page with a "Show low-stock
 products" filter (`?stock=low`; also `?stock=out`), a badge with the quantity to reorder on the product page (plus a
 "Request more" shortcut), the low-stock table on `/inventory/reports`, and `GET /api/products/low-stock`.
-Sending notifications or emails about it is phase 13.
+When a movement takes a product to or below its minimum, people who can see products are notified
+(`inventory.low_stock`, see `docs/notifications.md`).
 
 ## Suppliers
 
@@ -113,4 +114,4 @@ inventory, suppliers and purchasing (without approving purchases or posting to t
 - Serial / batch / expiry tracking, units of measure conversion, barcodes, product variants, bundles.
 - Reversing a goods receipt (record a stock out or adjustment instead); returns to suppliers; supplier credit notes.
 - Partial billing by line (bills are amounts against an order), supplier payment terms, multi-currency purchasing.
-- Low-stock notifications / emails and automatic reorder (phase 13 adds notifications).
+- Automatic reordering (low stock is notified — `docs/notifications.md` — but no order is created).

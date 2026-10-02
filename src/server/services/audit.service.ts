@@ -36,11 +36,23 @@ export async function recordAuditEvent(event: AuditEvent, client?: DbClient) {
   );
 }
 
-/** Records an action in the current company by the current user. Call inside the same transaction as the change. */
+/**
+ * Records an action in the current company by the current user, with the request's IP address and user agent when
+ * there is a web request. Call inside the same transaction as the change.
+ */
 export function writeAuditLog(
   ctx: TenantContext,
   event: Omit<AuditEvent, "companyId" | "actorId">,
   client?: DbClient,
 ) {
-  return recordAuditEvent({ ...event, companyId: ctx.companyId, actorId: ctx.userId }, client);
+  return recordAuditEvent(
+    {
+      ipAddress: ctx.client?.ipAddress,
+      userAgent: ctx.client?.userAgent,
+      ...event,
+      companyId: ctx.companyId,
+      actorId: ctx.userId,
+    },
+    client,
+  );
 }

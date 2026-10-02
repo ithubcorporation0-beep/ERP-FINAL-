@@ -21,7 +21,8 @@ export function Header({ shell }: { shell: ShellContext }) {
       </div>
 
       <div className="flex items-center gap-1">
-        <NotificationsButton unread={shell.unreadNotifications} />
+        {/* Keyed on the count, so a fresh server count (after router.refresh) resets the bell. */}
+        <NotificationsButton key={shell.unreadNotifications} unread={shell.unreadNotifications} />
         <UserMenu user={shell.user} companyName={shell.company.name} />
       </div>
     </header>

@@ -52,6 +52,14 @@ export const companyRepository = {
   },
 
   /** Ids of all active companies (used by the seed to refresh built-in roles everywhere). */
+  /** Active companies with their time zone (scheduled notification checks). */
+  listActiveForSchedule(client: DbClient = db) {
+    return client.company.findMany({
+      where: { deletedAt: null, status: "ACTIVE" },
+      select: { id: true, timezone: true },
+    });
+  },
+
   listIds(client: DbClient = db) {
     return client.company.findMany({ where: { deletedAt: null }, select: { id: true } });
   },

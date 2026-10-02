@@ -20,6 +20,7 @@ import type { DbClient } from "@/server/repositories/helpers";
 import { invoiceRepository, type InvoiceData } from "@/server/repositories/invoice.repository";
 import { numberSequenceRepository } from "@/server/repositories/number-sequence.repository";
 import { writeAuditLog } from "./audit.service";
+import { notify } from "./notification.service";
 import { ledgerService } from "./ledger.service";
 import { companyService } from "./company.service";
 import { recordHistory, snapshotText } from "./record-history";
@@ -164,6 +165,19 @@ export const invoiceService = {
         entityId: invoice.id,
         after: auditSnapshot(invoice),
         metadata: link ? { summary: `From ${link.source}`, quotationId: link.quotationId } : undefined,
+      },
+      tx,
+    );
+    await notify(
+      ctx.companyId,
+      {
+        type: "invoice.created",
+        title: `New invoice ${invoice.code}`,
+        body: `${invoice.customer.name} · ${invoice.currency} ${money(invoice.total)} · due ${dateToDateOnly(invoice.dueDate)}`,
+        link: `/sales/invoices/${invoice.id}`,
+        entityType: "Invoice",
+        entityId: invoice.id,
+        excludeUserIds: [ctx.userId],
       },
       tx,
     );

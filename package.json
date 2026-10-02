@@ -23,6 +23,7 @@
     "db:status": "prisma migrate status",
     "db:check": "prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code",
     "db:seed": "prisma db seed",
+    "notifications:run": "tsx --conditions=react-server scripts/run-notifications.ts",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate"
   },

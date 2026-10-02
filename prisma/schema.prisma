@@ -59,8 +59,8 @@ model Company {
   updatedById          String?       @map("updated_by") @db.Uuid
   deletedAt            DateTime?     @map("deleted_at") @db.Timestamptz(3)
 
-  createdBy              User?                   @relation("CompanyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy              User?                   @relation("CompanyUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdBy              User?                    @relation("CompanyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy              User?                    @relation("CompanyUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   memberships            Membership[]
   roles                  Role[]
   rolePermissions        RolePermission[]
@@ -108,6 +108,8 @@ model Company {
   supplierInvoices       SupplierInvoice[]
   supplierPayments       SupplierPayment[]
   notifications          Notification[]
+  notificationPrefs      NotificationPreference[]
+  emailOutbox            EmailOutbox[]
   authTokens             AuthToken[]
   sessions               Session[]
 
@@ -148,11 +150,13 @@ model User {
   createdBy User? @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   updatedBy User? @relation("UserUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
-  sessions      Session[]
-  authTokens    AuthToken[]    @relation("AuthTokenUser")
-  memberships   Membership[]   @relation("MembershipUser")
-  notifications Notification[]
-  auditLogs     AuditLog[]
+  sessions          Session[]
+  authTokens        AuthToken[]              @relation("AuthTokenUser")
+  memberships       Membership[]             @relation("MembershipUser")
+  notifications     Notification[]
+  notificationPrefs NotificationPreference[]
+  emailOutbox       EmailOutbox[]
+  auditLogs         AuditLog[]
 
   // Back-relations for created_by / updated_by columns (required by Prisma, not used in code).
   usersCreated                  User[]                  @relation("UserCreatedBy")
@@ -434,6 +438,7 @@ model AuditLog {
   @@index([companyId, createdAt(sort: Desc)])
   @@index([companyId, entityType, entityId])
   @@index([actorId, createdAt(sort: Desc)])
+  @@index([companyId, action])
   @@map("audit_logs")
 }
 
@@ -2003,20 +2008,92 @@ model NumberSequence {
   @@map("number_sequences")
 }
 
-/// In-app notifications; the header bell shows the unread count (phase 13 adds the full feature).
+/// In-app notifications for one user in one company (the header bell and /notifications). Rules: docs/notifications.md.
 model Notification {
-  id        String    @id @default(uuid(7)) @db.Uuid
-  companyId String    @map("company_id") @db.Uuid
-  userId    String    @map("user_id") @db.Uuid
-  title     String
-  body      String?
-  link      String?
-  readAt    DateTime? @map("read_at") @db.Timestamptz(3)
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  id         String    @id @default(uuid(7)) @db.Uuid
+  companyId  String    @map("company_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  /// Notification type key, e.g. "invoice.created" (src/config/notifications.ts).
+  type       String    @default("general")
+  title      String
+  body       String?
+  link       String?
+  entityType String?   @map("entity_type")
+  entityId   String?   @map("entity_id")
+  /// Set for notifications that must be sent once per event (e.g. "invoice.overdue:<id>"); unique per user.
+  dedupeKey  String?   @map("dedupe_key")
+  readAt     DateTime? @map("read_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  company Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emails  EmailOutbox[]
+
+  @@unique([companyId, userId, dedupeKey])
+  @@unique([id, companyId])
+  @@index([companyId, userId, readAt])
+  @@index([companyId, userId, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+/**
+ * Per-user, per-type choice of channels. No row = the type's default (src/config/notifications.ts).
+ */
+model NotificationPreference {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  type      String
+  inApp     Boolean  @map("in_app")
+  email     Boolean
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([companyId, userId, readAt])
-  @@map("notifications")
+  @@unique([companyId, userId, type])
+  @@map("notification_preferences")
+}
+
+enum OutboxChannel {
+  EMAIL
+}
+
+enum OutboxStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+/**
+ * Transactional outbox for external notification channels (email today; WhatsApp/SMS are future channels). Rows
+ * are written in the same transaction as the event and delivered afterwards by the dispatcher, with retries.
+ */
+model EmailOutbox {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  companyId      String        @map("company_id") @db.Uuid
+  userId         String        @map("user_id") @db.Uuid
+  notificationId String?       @map("notification_id") @db.Uuid
+  channel        OutboxChannel @default(EMAIL)
+  recipient      String
+  subject        String
+  body           String
+  link           String?
+  /// Same idea as Notification.dedupeKey: one email per user and event.
+  dedupeKey      String?       @map("dedupe_key")
+  status         OutboxStatus  @default(PENDING)
+  attempts       Int           @default(0)
+  lastError      String?       @map("last_error")
+  nextAttemptAt  DateTime      @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  sentAt         DateTime?     @map("sent_at") @db.Timestamptz(3)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notification Notification? @relation(fields: [notificationId, companyId], references: [id, companyId], onDelete: Cascade)
+
+  @@unique([companyId, userId, dedupeKey])
+  @@index([status, nextAttemptAt])
+  @@index([companyId, createdAt(sort: Desc)])
+  @@map("email_outbox")
 }

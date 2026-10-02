@@ -268,6 +268,20 @@ Rules, workflow, ledger rules and limitations: `docs/inventory.md`.
 | UI         | `src/features/inventory`, `src/features/purchasing`; lists reuse `SalesList`                                                                                                  |
 | Pages      | `/inventory` (+ `/products/…`, `/movements`, `/warehouses`, `/categories`, `/reports`), `/purchasing/suppliers`, `/requests`, `/orders` (+ `/receive`), `/bills`, `/payments` |
 
+## Notifications and audit logs
+
+Rules: `docs/notifications.md` and `docs/audit-logs.md`.
+
+| Piece        | Where                                                                                                                                              |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Types        | `src/config/notifications.ts` (types, audience, defaults); pure rules `src/lib/notifications.ts` (channels, retries, deadline stages, dedupe keys) |
+| Sending      | `notify()` in `notification.service.ts`, called by module services **inside their transaction**; writes `notifications` and `email_outbox` rows    |
+| Delivery     | `notificationService.dispatchEmails()` (outbox, `FOR UPDATE SKIP LOCKED`, retries); scheduled checks `notification-schedule.service.ts`            |
+| Scheduler    | `POST /api/cron/notifications` (`CRON_SECRET`) or `npm run notifications:run`                                                                      |
+| Audit viewer | `audit-log.service.ts` (list, detail, CSV export) over `audit-log.repository.ts`; labels `src/lib/audit/labels.ts`                                 |
+| UI           | Header bell `src/components/layout/notifications-button.tsx`; `src/features/notifications`, `src/features/audit`                                   |
+| Pages        | `/notifications`, `/notifications/preferences`, `/audit-logs`, `/audit-logs/[id]`                                                                  |
+
 ## Backend conventions
 
 ### Authentication and authorization
@@ -291,6 +305,8 @@ interface TenantContext {
   roleId: string;
   roleName: string;
   permissions: string[];
+  /** IP address and user agent of the request, copied into audit entries. */
+  client?: { ipAddress?: string; userAgent?: string };
 }
 ```
 
@@ -343,7 +359,8 @@ readable output in development; level via `LOG_LEVEL`. Keys that look secret (`p
 
 ### Audit log
 
-`audit_logs` is append-only. Snapshots (`before`/`after`) are serialized by `toAuditJson()`, which turns
+`audit_logs` is append-only — the trigger `audit_logs_append_only` refuses UPDATE and DELETE (`docs/audit-logs.md`).
+`writeAuditLog(ctx, event, tx)` adds the request's IP address and user agent from `ctx.client`. Snapshots (`before`/`after`) are serialized by `toAuditJson()`, which turns
 dates and decimals into JSON and redacts `passwordHash`, `tokenHash`, `password`, `token`.
 Action names are dotted verbs: `customer.create`, `setting.update`, `auth.login`, `auth.login_failed`.
 

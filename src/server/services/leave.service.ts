@@ -1,5 +1,5 @@
 import "server-only";
-import { WORKFORCE_STATUSES, type LeaveStatusKey } from "@/config/hr";
+import { LEAVE_TYPE_LABELS, WORKFORCE_STATUSES, type LeaveStatusKey } from "@/config/hr";
 import { formatRecordNumber } from "@/config/records";
 import { employedOn, workingDays } from "@/lib/attendance";
 import { dateOnlyToDate, dateToDateOnly } from "@/lib/date-range";
@@ -12,6 +12,7 @@ import { employeeRepository } from "@/server/repositories/employee.repository";
 import { leaveRepository, type LeaveScope } from "@/server/repositories/leave.repository";
 import { numberSequenceRepository } from "@/server/repositories/number-sequence.repository";
 import { writeAuditLog } from "./audit.service";
+import { notify } from "./notification.service";
 import { ownEmployee, workSchedule } from "./hr-shared";
 import { recordHistory, snapshotText } from "./record-history";
 import {
@@ -180,6 +181,20 @@ export const leaveService = {
         { action: "leave.create", entityType: "LeaveRequest", entityId: leave.id, after: snapshot(leave) },
         tx,
       );
+      await notify(
+        ctx.companyId,
+        {
+          type: "leave.requested",
+          title: `Leave request from ${leave.employee.name}`,
+          body: `${LEAVE_TYPE_LABELS[leave.type]}: ${input.startDate} to ${input.endDate} (${days} working ${days === 1 ? "day" : "days"}).`,
+          link: `/hr/leave/${leave.id}`,
+          entityType: "LeaveRequest",
+          entityId: leave.id,
+          // Approvers, but neither the employee nor whoever filed it.
+          excludeUserIds: [ctx.userId, leave.employee.userId],
+        },
+        tx,
+      );
       return leave;
     });
   },
@@ -228,6 +243,21 @@ export const leaveService = {
         },
         tx,
       );
+      if (leave.employee.userId) {
+        await notify(
+          ctx.companyId,
+          {
+            type: "leave.decided",
+            title: `Your leave request was ${status === "APPROVED" ? "approved" : "rejected"}`,
+            body: `${LEAVE_TYPE_LABELS[leave.type]}: ${dateToDateOnly(leave.startDate)} to ${dateToDateOnly(leave.endDate)}.${note ? ` Note: ${note}` : ""}`,
+            link: `/hr/leave/${leave.id}`,
+            entityType: "LeaveRequest",
+            entityId: leave.id,
+            userIds: [leave.employee.userId],
+          },
+          tx,
+        );
+      }
     });
   },
 

@@ -401,3 +401,31 @@ Supplier invoices post Dr Purchases (an expense account) / Cr Accounts Payable; 
 don't post. This keeps the ledger correct without costing every stock movement (FIFO/average cost, COGS on sale),
 which needs sales-to-stock integration that doesn't exist yet. The inventory valuation report is a management
 figure, not a balance-sheet amount; moving to perpetual inventory is a later, explicit change.
+
+## ADR-049: Notifications written in the event's transaction, emails through an outbox (phase 13)
+
+`notify()` runs inside the transaction of the business event and writes the in-app notifications and queued emails
+there, so a notification can't exist for an invoice that was rolled back, and an event can't commit without its
+notifications. Emails are never sent inside that transaction (a slow SMTP server would hold locks and could fail a
+valid save); a dispatcher claims due outbox rows with `FOR UPDATE SKIP LOCKED`, sends them and retries failures with
+exponential backoff up to five attempts. WhatsApp and SMS fit the same design as further outbox channels.
+Alternatives rejected: a message broker (another service to run, not needed at this size) and sending after commit
+from the request (lost on a crash, no retries).
+
+## ADR-050: Recipients from permissions, preferences per type, reminders deduplicated by key (phase 13)
+
+Broadcast notifications go to the active members whose role grants the type's view permission, so nobody is told
+about records they can't open, and roles control the audience without extra settings. Personal ones (assigned
+task, leave decision, deadlines) go to the linked user of the employee record. The actor is always excluded. Each
+user can turn in-app and email on or off per type; without a saved row the type's defaults apply. Time-based
+reminders run from an external scheduler (cron route with `CRON_SECRET`, or a script) per company in its time zone;
+a unique `(company, user, dedupe_key)` with `skipDuplicates` makes repeated or concurrent runs harmless.
+
+## ADR-051: Append-only audit log enforced by the database (phase 13)
+
+"Normal users must not edit audit logs" is enforced at every layer: no permission grants it, the repository has no
+update or delete, the API is GET-only, and a trigger refuses UPDATE and DELETE for every database user — only the
+foreign key's `SET NULL` on a deleted actor is allowed through. The request's IP address and user agent are captured
+once in the tenant context and added to every entry by `writeAuditLog`, so modules don't have to pass them. Sign-in
+and sign-out are attributed to the user's default / active company so they appear in that company's log. Shipping
+entries to an external write-once store is left to production hardening.

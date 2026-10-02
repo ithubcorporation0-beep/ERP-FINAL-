@@ -6,7 +6,7 @@ import { authService } from "@/server/services/auth.service";
 
 export const POST = handle(async () => {
   const info = await requestClientInfo();
-  const userId = await destroySession();
-  if (userId) await authService.recordLogout(userId, info);
+  const ended = await destroySession();
+  if (ended) await authService.recordLogout(ended.userId, info, ended.activeCompanyId);
   return new NextResponse(null, { status: 204 });
 });

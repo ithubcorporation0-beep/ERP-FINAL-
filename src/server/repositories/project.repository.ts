@@ -185,6 +185,15 @@ export const projectRepository = {
     });
   },
 
+  /** Open projects ending on or before `until` (deadline reminders). */
+  listEndingForReminder(companyId: string, until: Date, client: DbClient = db) {
+    return client.project.findMany({
+      where: { companyId, deletedAt: null, status: { in: OPEN }, endDate: { lte: until } },
+      select: { id: true, number: true, name: true, endDate: true, manager: { select: { userId: true } } },
+      take: 500,
+    });
+  },
+
   listRecent(companyId: string, scope: ProjectScope, limit: number, client: DbClient = db) {
     return client.project.findMany({
       where: { companyId, deletedAt: null, AND: [scopeFilter(scope)] },

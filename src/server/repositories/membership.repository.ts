@@ -106,6 +106,29 @@ export const membershipRepository = {
     return rows.map((row) => row.user);
   },
 
+  /** Active members (with active accounts) whose role grants `permission` — notification audiences. */
+  async listUsersWithPermission(companyId: string, permission: string, client: DbClient = db) {
+    const rows = await client.membership.findMany({
+      where: {
+        companyId,
+        status: "ACTIVE",
+        user: { status: "ACTIVE" },
+        role: { rolePermissions: { some: { permission: { key: permission } } } },
+      },
+      select: { user: { select: { id: true, name: true, email: true } } },
+    });
+    return rows.map((row) => row.user);
+  },
+
+  /** Active members (with active accounts) among the given users — e.g. an assignee's login. */
+  async listActiveUsersByIds(companyId: string, userIds: readonly string[], client: DbClient = db) {
+    const rows = await client.membership.findMany({
+      where: { companyId, status: "ACTIVE", userId: { in: [...userIds] }, user: { status: "ACTIVE" } },
+      select: { user: { select: { id: true, name: true, email: true } } },
+    });
+    return rows.map((row) => row.user);
+  },
+
   findByUser(companyId: string, userId: string, client: DbClient = db) {
     return client.membership.findUnique({
       where: { companyId_userId: { companyId, userId } },

@@ -7,6 +7,8 @@ import { rawDb } from "../integration/raw-db";
 const TABLES = [
   "audit_logs",
   "auth_tokens",
+  "email_outbox",
+  "notification_preferences",
   "notifications",
   "supplier_payments",
   "supplier_invoices",

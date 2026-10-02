@@ -81,15 +81,15 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
 }
 
 /** Ends the current session. Returns the user id it belonged to (for the audit log), if any. */
-export async function destroySession(): Promise<string | null> {
+export async function destroySession(): Promise<{ userId: string; activeCompanyId: string | null } | null> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
-  let userId: string | null = null;
+  let ended: { userId: string; activeCompanyId: string | null } | null = null;
   if (token) {
     const session = await sessionRepository.findByTokenHash(hashToken(token));
-    userId = session?.user.id ?? null;
+    ended = session ? { userId: session.user.id, activeCompanyId: session.activeCompanyId } : null;
     await sessionRepository.deleteByTokenHash(hashToken(token));
   }
   store.delete(SESSION_COOKIE);
-  return userId;
+  return ended;
 }

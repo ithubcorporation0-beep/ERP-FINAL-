@@ -113,6 +113,5 @@ These are **not** implemented and nothing in the app pretends they are:
 - Leave balances, entitlements, accruals and carry-over; half-day leave.
 - Attendance correction requests from employees; approval of attendance (`attendance:approve` currently only
   grants visibility).
-- Email / in-app notifications for leave decisions (notifications are phase 13).
 - Bulk import of employees and attendance exports (reports and exports are phase 14).
 - Encryption key rotation tooling.
